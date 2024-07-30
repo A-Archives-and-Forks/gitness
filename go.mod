@@ -49,7 +49,7 @@ require (
 	github.com/rs/xid v1.4.0
 	github.com/rs/zerolog v1.29.0
 	github.com/sercand/kuberesolver/v5 v5.1.0
-	github.com/sirupsen/logrus v1.9.0
+	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
 	github.com/swaggest/openapi-go v0.2.23
 	github.com/swaggest/swgui v1.8.0
@@ -57,12 +57,12 @@ require (
 	github.com/zricethezav/gitleaks/v8 v8.18.2
 	go.starlark.net v0.0.0-20231121155337-90ade8b19d09
 	go.uber.org/multierr v1.8.0
-	golang.org/x/crypto v0.14.0
+	golang.org/x/crypto v0.20.0
 	golang.org/x/exp v0.0.0-20230108222341-4b8118a2686a
 	golang.org/x/oauth2 v0.10.0
 	golang.org/x/sync v0.3.0
-	golang.org/x/term v0.13.0
-	golang.org/x/text v0.13.0
+	golang.org/x/term v0.17.0
+	golang.org/x/text v0.14.0
 	google.golang.org/api v0.132.0
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/mail.v2 v2.3.1
@@ -70,9 +70,9 @@ require (
 
 require (
 	cloud.google.com/go v0.110.4 // indirect
-	cloud.google.com/go/compute v1.20.1 // indirect
+	cloud.google.com/go/compute v1.21.0 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
-	cloud.google.com/go/iam v1.1.0 // indirect
+	cloud.google.com/go/iam v1.1.1 // indirect
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/99designs/httpsignatures-go v0.0.0-20170731043157-88528bf4ca7e // indirect
 	github.com/BobuSumisu/aho-corasick v1.0.3 // indirect
@@ -82,7 +82,7 @@ require (
 	github.com/bmatcuk/doublestar v1.3.4 // indirect
 	github.com/buildkite/yaml v2.1.0+incompatible // indirect
 	github.com/charmbracelet/lipgloss v0.5.0 // indirect
-	github.com/containerd/containerd v1.7.6 // indirect
+	github.com/containerd/containerd v1.7.11 // indirect
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/docker/docker v23.0.3+incompatible // indirect
@@ -101,7 +101,7 @@ require (
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/h2non/filetype v1.1.3 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
-	github.com/jackc/pgx/v4 v4.12.0 // indirect
+	github.com/jackc/pgx/v4 v4.18.2 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
@@ -132,10 +132,10 @@ require (
 	golang.org/x/time v0.0.0-20220411224347-583f2d630306 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20230706204954-ccb25ca9f130 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20230711160842-782d3b101e98 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230711160842-782d3b101e98 // indirect
-	google.golang.org/grpc v1.56.2 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
+	google.golang.org/grpc v1.58.3 // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/ini.v1 v1.62.0 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
@@ -165,16 +165,16 @@ require (
 	github.com/lann/ps v0.0.0-20150810152359-62de8c46ede0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/sergi/go-diff v1.3.1 // indirect
-	github.com/swaggest/jsonschema-go v0.3.40 // indirect
+	github.com/swaggest/jsonschema-go v0.3.40
 	github.com/swaggest/refl v1.1.0 // indirect
 	github.com/vearutop/statigz v1.4.0 // indirect
 	github.com/yuin/goldmark v1.4.13
 	go.uber.org/atomic v1.10.0 // indirect
 	golang.org/x/mod v0.12.0 // indirect
-	golang.org/x/net v0.17.0 // indirect
-	golang.org/x/sys v0.14.0 // indirect
+	golang.org/x/net v0.21.0 // indirect
+	golang.org/x/sys v0.17.0 // indirect
 	golang.org/x/tools v0.13.0 // indirect
-	google.golang.org/genproto v0.0.0-20230706204954-ccb25ca9f130 // indirect
+	google.golang.org/genproto v0.0.0-20230711160842-782d3b101e98 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1
 )

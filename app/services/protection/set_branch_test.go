@@ -331,6 +331,92 @@ func TestRuleSet_MergeVerify(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "merge-queue-requires-merge-queue",
+			rules: []types.RuleInfoInternal{
+				{
+					RuleInfo: types.RuleInfo{
+						RepoPath:   "space/repo",
+						ID:         1,
+						Identifier: "rule1",
+						Type:       TypeBranch,
+						State:      enum.RuleStateActive,
+					},
+					Pattern: []byte(`{"default":true}`),
+					Definition: []byte(`{
+						"pullreq": {
+							"merge_queue": {
+								"status_checks": {"require_identifiers": ["ci"]},
+								"group_size": 5,
+								"checks_concurrency": 3,
+								"max_check_duration_seconds": 600
+							}
+						}
+					}`),
+					RepoTarget: emptyRepoTarget,
+				},
+			},
+			input: MergeVerifyInput{
+				Actor:      &types.Principal{ID: 1},
+				TargetRepo: &types.RepositoryCore{ID: 1, DefaultBranch: "main"},
+				PullReq:    &types.PullReq{ID: 1, SourceBranch: "pr", TargetBranch: "main"},
+			},
+			expOut: MergeVerifyOutput{
+				AllowedMethods:     enum.MergeMethods,
+				RequiresMergeQueue: true,
+			},
+			expViol: []types.RuleViolations{
+				{
+					Rule: types.RuleInfo{
+						RepoPath:   "space/repo",
+						ID:         1,
+						Identifier: "rule1",
+						Type:       TypeBranch,
+						State:      enum.RuleStateActive,
+					},
+					Violations: []types.Violation{
+						{Code: codeMergeQueueBranchUpdateVerify},
+					},
+				},
+			},
+		},
+		{
+			name: "merge-queue-omit-violations",
+			rules: []types.RuleInfoInternal{
+				{
+					RuleInfo: types.RuleInfo{
+						RepoPath:   "space/repo",
+						ID:         1,
+						Identifier: "rule1",
+						Type:       TypeBranch,
+						State:      enum.RuleStateActive,
+					},
+					Pattern: []byte(`{"default":true}`),
+					Definition: []byte(`{
+						"pullreq": {
+							"merge_queue": {
+								"status_checks": {"require_identifiers": ["ci"]},
+								"group_size": 5,
+								"checks_concurrency": 3,
+								"max_check_duration_seconds": 600
+							}
+						}
+					}`),
+					RepoTarget: emptyRepoTarget,
+				},
+			},
+			input: MergeVerifyInput{
+				Actor:            &types.Principal{ID: 1},
+				TargetRepo:       &types.RepositoryCore{ID: 1, DefaultBranch: "main"},
+				PullReq:          &types.PullReq{ID: 1, SourceBranch: "pr", TargetBranch: "main"},
+				OmitMQViolations: true,
+			},
+			expOut: MergeVerifyOutput{
+				AllowedMethods:     enum.MergeMethods,
+				RequiresMergeQueue: true,
+			},
+			expViol: nil,
+		},
 	}
 
 	ctx := context.Background()

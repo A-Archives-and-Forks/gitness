@@ -67,6 +67,7 @@ func (s branchRuleSet) MergeVerify(
 			out.RequiresNoChangeRequests = out.RequiresNoChangeRequests || rOut.RequiresNoChangeRequests
 			out.RequiresBypassMessage = out.RequiresBypassMessage || rOut.RequiresBypassMessage
 			out.DefaultReviewerApprovals = append(out.DefaultReviewerApprovals, rOut.DefaultReviewerApprovals...)
+			out.RequiresMergeQueue = out.RequiresMergeQueue || rOut.RequiresMergeQueue
 
 			return nil
 		})

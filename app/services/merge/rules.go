@@ -40,6 +40,23 @@ func (s *Service) CheckRules(
 	protectionRules protection.BranchProtection,
 	in CheckRulesInput,
 ) (protection.MergeVerifyOutput, []types.RuleViolations, error) {
+	return s.checkRules(ctx, protectionRules, false, in)
+}
+
+func (s *Service) CheckRulesForMergeQueue(
+	ctx context.Context,
+	protectionRules protection.BranchProtection,
+	in CheckRulesInput,
+) (protection.MergeVerifyOutput, []types.RuleViolations, error) {
+	return s.checkRules(ctx, protectionRules, true, in)
+}
+
+func (s *Service) checkRules(
+	ctx context.Context,
+	protectionRules protection.BranchProtection,
+	isMergeQueue bool,
+	in CheckRulesInput,
+) (protection.MergeVerifyOutput, []types.RuleViolations, error) {
 	reviewers, err := s.reviewerStore.List(ctx, in.PullReq.ID)
 	if err != nil {
 		return protection.MergeVerifyOutput{}, nil, fmt.Errorf("failed to load list of reviwers: %w", err)
@@ -68,6 +85,7 @@ func (s *Service) CheckRules(
 		Method:              in.MergeMethod,
 		CheckResults:        checkResults,
 		CodeOwners:          codeOwnerWithApproval,
+		OmitMQViolations:    isMergeQueue,
 	})
 	if err != nil {
 		return protection.MergeVerifyOutput{}, nil, fmt.Errorf("failed to verify protection rules: %w", err)

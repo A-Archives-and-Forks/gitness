@@ -105,7 +105,7 @@ func (c *Controller) MergeQueueEnable(
 			usererror.BadRequestf("Merge queue has not been configured for branch %q.", pr.TargetBranch)
 	}
 
-	_, violations, err := c.mergeService.CheckRules(ctx, protectionRules, merge.CheckRulesInput{
+	_, violations, err := c.mergeService.CheckRulesForMergeQueue(ctx, protectionRules, merge.CheckRulesInput{
 		PullReq:          pr,
 		TargetRepo:       targetRepo,
 		SourceRepo:       sourceRepo,

@@ -282,22 +282,31 @@ type MergeResponse struct {
 	RuleViolations []RuleViolations `json:"rule_violations,omitempty"`
 
 	// values only returned on dryrun
-	DryRunRules    bool               `json:"dry_run_rules,omitempty"`
-	DryRun         bool               `json:"dry_run,omitempty"`
-	Mergeable      bool               `json:"mergeable,omitempty"`
-	ConflictFiles  []string           `json:"conflict_files,omitempty"`
+	DryRunRules   bool     `json:"dry_run_rules,omitempty"`
+	DryRun        bool     `json:"dry_run,omitempty"`
+	Mergeable     bool     `json:"mergeable,omitempty"`
+	ConflictFiles []string `json:"conflict_files,omitempty"`
+
+	MergeVerifyOutput
+}
+
+// MergeVerifyOutput is identical copy of protection.MergeVerifyOutput, but with JSON struct tags.
+type MergeVerifyOutput struct {
 	AllowedMethods []enum.MergeMethod `json:"allowed_methods,omitempty"`
+
+	DeleteSourceBranch bool `json:"-"`
 
 	MinimumRequiredApprovalsCount       int `json:"minimum_required_approvals_count,omitempty"`
 	MinimumRequiredApprovalsCountLatest int `json:"minimum_required_approvals_count_latest,omitempty"`
 
-	DefaultReviewerApprovals []*DefaultReviewerApprovalsResponse `json:"default_reviewer_aprovals,omitempty"`
+	DefaultReviewerApprovals []*DefaultReviewerApprovalsResponse `json:"default_reviewer_approvals,omitempty"`
 
 	RequiresCodeOwnersApproval       bool `json:"requires_code_owners_approval,omitempty"`
 	RequiresCodeOwnersApprovalLatest bool `json:"requires_code_owners_approval_latest,omitempty"`
 	RequiresCommentResolution        bool `json:"requires_comment_resolution,omitempty"`
 	RequiresNoChangeRequests         bool `json:"requires_no_change_requests,omitempty"`
 	RequiresBypassMessage            bool `json:"requires_bypass_message,omitempty"`
+	RequiresMergeQueue               bool `json:"requires_merge_queue,omitempty"`
 }
 
 type MergeViolations struct {

@@ -48,19 +48,25 @@ type (
 		Method              enum.MergeMethod // the method can be empty for dry run or dry run rules
 		CheckResults        []types.CheckResult
 		CodeOwners          *codeowners.Evaluation
+		OmitMQViolations    bool // should be set to true only by the merge queue service
 	}
 
 	MergeVerifyOutput struct {
-		AllowedMethods                      []enum.MergeMethod
-		DeleteSourceBranch                  bool
+		AllowedMethods []enum.MergeMethod
+
+		DeleteSourceBranch bool
+
 		MinimumRequiredApprovalsCount       int
 		MinimumRequiredApprovalsCountLatest int
-		RequiresCodeOwnersApproval          bool
-		RequiresCodeOwnersApprovalLatest    bool
-		RequiresCommentResolution           bool
-		RequiresNoChangeRequests            bool
-		RequiresBypassMessage               bool
-		DefaultReviewerApprovals            []*types.DefaultReviewerApprovalsResponse
+
+		DefaultReviewerApprovals []*types.DefaultReviewerApprovalsResponse
+
+		RequiresCodeOwnersApproval       bool
+		RequiresCodeOwnersApprovalLatest bool
+		RequiresCommentResolution        bool
+		RequiresNoChangeRequests         bool
+		RequiresBypassMessage            bool
+		RequiresMergeQueue               bool
 	}
 
 	RequiredChecksInput struct {
@@ -384,6 +390,18 @@ func (v *DefPullReq) MergeVerify(
 		violations.Addf(
 			codePullReqMergeBlock,
 			"The merge for the branch %s is not allowed.", in.PullReq.TargetBranch)
+	}
+
+	// pullreq.merge_queue
+
+	if v.MergeQueue != nil && len(v.MergeQueue.StatusChecks.RequireIdentifiers) > 0 {
+		if !in.OmitMQViolations {
+			violations.Addf(codeMergeQueueBranchUpdateVerify,
+				"Direct modification of branch %q is not allowed: the branch has a merge queue configured.",
+				in.PullReq.TargetBranch)
+		}
+
+		out.RequiresMergeQueue = true
 	}
 
 	if len(violations.Violations) > 0 {

@@ -207,6 +207,57 @@ func TestBranch_MergeVerify(t *testing.T) {
 			},
 		},
 		{
+			name: "merge-queue-violation",
+			branch: Branch{
+				PullReq: DefPullReq{
+					MergeQueue: &DefMergeQueue{
+						StatusChecks:            DefStatusChecks{RequireIdentifiers: []string{"ci"}},
+						GroupSize:               5,
+						ChecksConcurrency:       3,
+						MaxCheckDurationSeconds: 600,
+					},
+				},
+			},
+			in: MergeVerifyInput{
+				Actor:   user,
+				PullReq: &types.PullReq{TargetBranch: "main"},
+			},
+			expOut: MergeVerifyOutput{
+				AllowedMethods:     enum.MergeMethods,
+				RequiresMergeQueue: true,
+			},
+			expVs: []types.RuleViolations{
+				{
+					Violations: []types.Violation{
+						{Code: codeMergeQueueBranchUpdateVerify},
+					},
+				},
+			},
+		},
+		{
+			name: "merge-queue-omit-violations",
+			branch: Branch{
+				PullReq: DefPullReq{
+					MergeQueue: &DefMergeQueue{
+						StatusChecks:            DefStatusChecks{RequireIdentifiers: []string{"ci"}},
+						GroupSize:               5,
+						ChecksConcurrency:       3,
+						MaxCheckDurationSeconds: 600,
+					},
+				},
+			},
+			in: MergeVerifyInput{
+				Actor:            user,
+				PullReq:          &types.PullReq{TargetBranch: "main"},
+				OmitMQViolations: true,
+			},
+			expOut: MergeVerifyOutput{
+				AllowedMethods:     enum.MergeMethods,
+				RequiresMergeQueue: true,
+			},
+			expVs: []types.RuleViolations{},
+		},
+		{
 			name: "verify-output-latest",
 			branch: Branch{
 				Bypass: DefBypass{},

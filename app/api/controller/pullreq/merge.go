@@ -273,16 +273,8 @@ func (c *Controller) Merge(
 			BranchDeleted:  deleteSourceBranch,
 			RuleViolations: violations,
 
-			DryRunRules:                         true,
-			AllowedMethods:                      ruleOut.AllowedMethods,
-			RequiresCodeOwnersApproval:          ruleOut.RequiresCodeOwnersApproval,
-			RequiresCodeOwnersApprovalLatest:    ruleOut.RequiresCodeOwnersApprovalLatest,
-			RequiresCommentResolution:           ruleOut.RequiresCommentResolution,
-			RequiresNoChangeRequests:            ruleOut.RequiresNoChangeRequests,
-			RequiresBypassMessage:               ruleOut.RequiresBypassMessage,
-			MinimumRequiredApprovalsCount:       ruleOut.MinimumRequiredApprovalsCount,
-			MinimumRequiredApprovalsCountLatest: ruleOut.MinimumRequiredApprovalsCountLatest,
-			DefaultReviewerApprovals:            ruleOut.DefaultReviewerApprovals,
+			DryRunRules:       true,
+			MergeVerifyOutput: types.MergeVerifyOutput(ruleOut),
 		}, nil, nil
 	}
 
@@ -425,18 +417,10 @@ func (c *Controller) Merge(
 			RuleViolations: violations,
 
 			// values only returned by dry run
-			DryRun:                              true,
-			Mergeable:                           len(conflicts) == 0,
-			ConflictFiles:                       conflicts,
-			AllowedMethods:                      ruleOut.AllowedMethods,
-			RequiresCodeOwnersApproval:          ruleOut.RequiresCodeOwnersApproval,
-			RequiresCodeOwnersApprovalLatest:    ruleOut.RequiresCodeOwnersApprovalLatest,
-			RequiresCommentResolution:           ruleOut.RequiresCommentResolution,
-			RequiresNoChangeRequests:            ruleOut.RequiresNoChangeRequests,
-			RequiresBypassMessage:               ruleOut.RequiresBypassMessage,
-			MinimumRequiredApprovalsCount:       ruleOut.MinimumRequiredApprovalsCount,
-			MinimumRequiredApprovalsCountLatest: ruleOut.MinimumRequiredApprovalsCountLatest,
-			DefaultReviewerApprovals:            ruleOut.DefaultReviewerApprovals,
+			DryRun:            true,
+			Mergeable:         len(conflicts) == 0,
+			ConflictFiles:     conflicts,
+			MergeVerifyOutput: types.MergeVerifyOutput(ruleOut),
 		}
 
 		return out, nil, nil

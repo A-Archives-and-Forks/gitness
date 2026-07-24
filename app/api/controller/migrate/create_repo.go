@@ -113,19 +113,20 @@ func (c *Controller) CreateRepo(
 		}
 
 		repo = &types.Repository{
-			Version:       0,
-			ParentID:      parentSpace.ID,
-			RootSpaceID:   parentSpace.RootSpaceID,
-			Identifier:    in.Identifier,
-			GitUID:        gitResp.UID,
-			CreatedBy:     session.Principal.ID,
-			Created:       now.UnixMilli(),
-			Updated:       now.UnixMilli(),
-			LastGITPush:   now.UnixMilli(), // even in case of an empty repo, the git repo got created.
-			DefaultBranch: in.DefaultBranch,
-			IsEmpty:       true,
-			State:         enum.RepoStateMigrateGitPush,
-			Tags:          json.RawMessage(`{}`),
+			Version:             0,
+			ParentID:            parentSpace.ID,
+			RootSpaceID:         parentSpace.RootSpaceID,
+			RootSpaceIdentifier: parentSpace.RootSpaceIdentifier,
+			Identifier:          in.Identifier,
+			GitUID:              gitResp.UID,
+			CreatedBy:           session.Principal.ID,
+			Created:             now.UnixMilli(),
+			Updated:             now.UnixMilli(),
+			LastGITPush:         now.UnixMilli(), // even in case of an empty repo, the git repo got created.
+			DefaultBranch:       in.DefaultBranch,
+			IsEmpty:             true,
+			State:               enum.RepoStateMigrateGitPush,
+			Tags:                json.RawMessage(`{}`),
 		}
 
 		return c.repoStore.Create(ctx, repo)

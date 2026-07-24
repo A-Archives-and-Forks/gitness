@@ -32,7 +32,6 @@ type RepositoryCore struct {
 	ForkID        int64          `json:"fork_id" yaml:"fork_id"`
 	State         enum.RepoState `json:"-" yaml:"-"`
 	Type          enum.RepoType  `json:"type,omitempty" yaml:"type,omitempty"`
-	RootSpaceID   int64          `json:"root_space_id" yaml:"root_space_id"`
 }
 
 func (r *RepositoryCore) GetGitUID() string {
@@ -42,18 +41,19 @@ func (r *RepositoryCore) GetGitUID() string {
 // Repository represents a code repository.
 type Repository struct {
 	// TODO: int64 ID doesn't match DB
-	ID          int64  `json:"id" yaml:"id"`
-	Version     int64  `json:"-" yaml:"-"`
-	ParentID    int64  `json:"parent_id" yaml:"parent_id"`
-	Identifier  string `json:"identifier" yaml:"identifier"`
-	Path        string `json:"path" yaml:"path"`
-	Description string `json:"description" yaml:"description"`
-	RootSpaceID int64  `json:"root_space_id" yaml:"root_space_id"`
-	CreatedBy   int64  `json:"created_by" yaml:"created_by"`
-	Created     int64  `json:"created" yaml:"created"`
-	Updated     int64  `json:"updated" yaml:"updated"`
-	Deleted     *int64 `json:"deleted,omitempty" yaml:"deleted"`
-	LastGITPush int64  `json:"last_git_push" yaml:"last_git_push"`
+	ID                  int64  `json:"id" yaml:"id"`
+	Version             int64  `json:"-" yaml:"-"`
+	ParentID            int64  `json:"parent_id" yaml:"parent_id"`
+	Identifier          string `json:"identifier" yaml:"identifier"`
+	Path                string `json:"path" yaml:"path"`
+	Description         string `json:"description" yaml:"description"`
+	RootSpaceID         int64  `json:"root_space_id" yaml:"root_space_id"`
+	RootSpaceIdentifier string `json:"root_space_identifier" yaml:"root_space_identifier"`
+	CreatedBy           int64  `json:"created_by" yaml:"created_by"`
+	Created             int64  `json:"created" yaml:"created"`
+	Updated             int64  `json:"updated" yaml:"updated"`
+	Deleted             *int64 `json:"deleted,omitempty" yaml:"deleted"`
+	LastGITPush         int64  `json:"last_git_push" yaml:"last_git_push"`
 
 	// Size of the repository in KiB.
 	Size    int64 `json:"size" yaml:"size" description:"size of the repository in KiB"`
@@ -97,7 +97,6 @@ func (r *Repository) Core() *RepositoryCore {
 		DefaultBranch: r.DefaultBranch,
 		State:         r.State,
 		Type:          r.Type,
-		RootSpaceID:   r.RootSpaceID,
 	}
 }
 

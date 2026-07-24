@@ -79,8 +79,6 @@ func (c *Controller) ImportRepositories(
 			"",
 			&session.Principal,
 		)
-		repo.RootSpaceID = space.RootSpaceID
-
 		if err := c.repoIdentifierCheck(repo.Identifier, session); err != nil {
 			return ImportRepositoriesOutput{}, fmt.Errorf("failed to sanitize the repo %s: %w", repo.Identifier, err)
 		}
@@ -92,7 +90,7 @@ func (c *Controller) ImportRepositories(
 
 	err = c.tx.WithTx(ctx, func(ctx context.Context) error {
 		// lock the space for update during repo creation to prevent racing conditions with space soft delete.
-		_, err = c.spaceStore.FindForUpdate(ctx, space.ID)
+		spaceFull, err := c.spaceStore.FindForUpdate(ctx, space.ID)
 		if err != nil {
 			return fmt.Errorf("failed to find the parent space: %w", err)
 		}
@@ -103,6 +101,9 @@ func (c *Controller) ImportRepositories(
 		}
 
 		for _, repo := range repos {
+			repo.RootSpaceID = spaceFull.RootSpaceID
+			repo.RootSpaceIdentifier = spaceFull.RootSpaceIdentifier
+
 			err = c.repoStore.Create(ctx, repo)
 			if errors.Is(err, store.ErrDuplicate) {
 				return usererror.Conflict(fmt.Sprintf(

@@ -129,8 +129,6 @@ func (c *Controller) LinkedCreate(
 		&session.Principal,
 		access.DefaultBranch,
 	)
-	repo.RootSpaceID = parentSpace.RootSpaceID
-
 	repo.Type = enum.RepoTypeLinked
 
 	now := time.Now().UnixMilli()
@@ -141,10 +139,13 @@ func (c *Controller) LinkedCreate(
 		}
 
 		// lock the space for update during repo creation to prevent racing conditions with space soft delete.
-		_, err = c.spaceStore.FindForUpdate(ctx, parentSpace.ID)
+		parentSpaceFull, err := c.spaceStore.FindForUpdate(ctx, parentSpace.ID)
 		if err != nil {
 			return fmt.Errorf("failed to find the parent space: %w", err)
 		}
+
+		repo.RootSpaceID = parentSpaceFull.RootSpaceID
+		repo.RootSpaceIdentifier = parentSpaceFull.RootSpaceIdentifier
 
 		err = c.repoStore.Create(ctx, repo)
 		if err != nil {

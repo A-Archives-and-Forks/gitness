@@ -124,7 +124,7 @@ func (c *Controller) Create(ctx context.Context, session *auth.Session, in *Crea
 		}
 
 		// lock the space for update during repo creation to prevent racing conditions with space soft delete.
-		_, err = c.spaceStore.FindForUpdate(ctx, parentSpace.ID)
+		parentSpaceFull, err := c.spaceStore.FindForUpdate(ctx, parentSpace.ID)
 		if err != nil {
 			return fmt.Errorf("failed to find the parent space: %w", err)
 		}
@@ -132,20 +132,21 @@ func (c *Controller) Create(ctx context.Context, session *auth.Session, in *Crea
 		now := time.Now().UnixMilli()
 		tags, _ := json.Marshal(in.Tags) // should never fail as we sanitize the input type
 		repo = &types.Repository{
-			Version:       0,
-			ParentID:      parentSpace.ID,
-			RootSpaceID:   parentSpace.RootSpaceID,
-			Identifier:    in.Identifier,
-			GitUID:        gitResp.UID,
-			Description:   in.Description,
-			CreatedBy:     session.Principal.ID,
-			Created:       now,
-			Updated:       now,
-			LastGITPush:   now, // even in case of an empty repo, the git repo got created.
-			ForkID:        0,
-			DefaultBranch: in.DefaultBranch,
-			IsEmpty:       isEmpty,
-			Tags:          tags,
+			Version:             0,
+			ParentID:            parentSpace.ID,
+			RootSpaceID:         parentSpaceFull.RootSpaceID,
+			RootSpaceIdentifier: parentSpaceFull.RootSpaceIdentifier,
+			Identifier:          in.Identifier,
+			GitUID:              gitResp.UID,
+			Description:         in.Description,
+			CreatedBy:           session.Principal.ID,
+			Created:             now,
+			Updated:             now,
+			LastGITPush:         now, // even in case of an empty repo, the git repo got created.
+			ForkID:              0,
+			DefaultBranch:       in.DefaultBranch,
+			IsEmpty:             isEmpty,
+			Tags:                tags,
 		}
 
 		return c.repoStore.Create(ctx, repo)

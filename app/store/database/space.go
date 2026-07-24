@@ -62,14 +62,15 @@ type space struct {
 	ID      int64 `db:"space_id"`
 	Version int64 `db:"space_version"`
 	// IMPORTANT: We need to make parentID optional for spaces to allow it to be a foreign key.
-	ParentID    null.Int `db:"space_parent_id"`
-	Identifier  string   `db:"space_uid"`
-	Description string   `db:"space_description"`
-	RootSpaceID int64    `db:"space_root_space_id"`
-	CreatedBy   int64    `db:"space_created_by"`
-	Created     int64    `db:"space_created"`
-	Updated     int64    `db:"space_updated"`
-	Deleted     null.Int `db:"space_deleted"`
+	ParentID            null.Int `db:"space_parent_id"`
+	Identifier          string   `db:"space_uid"`
+	Description         string   `db:"space_description"`
+	RootSpaceID         int64    `db:"space_root_space_id"`
+	RootSpaceIdentifier string   `db:"space_root_space_identifier"`
+	CreatedBy           int64    `db:"space_created_by"`
+	Created             int64    `db:"space_created"`
+	Updated             int64    `db:"space_updated"`
+	Deleted             null.Int `db:"space_deleted"`
 }
 
 const (
@@ -80,6 +81,7 @@ const (
 		,space_uid
 		,space_description
 		,space_root_space_id
+		,space_root_space_identifier
 		,space_created_by
 		,space_created
 		,space_updated
@@ -456,6 +458,7 @@ func (s *SpaceStore) Create(ctx context.Context, space *types.Space) error {
 			,space_uid
 			,space_description
 			,space_root_space_id
+			,space_root_space_identifier
 			,space_created_by
 			,space_created
 			,space_updated
@@ -466,6 +469,7 @@ func (s *SpaceStore) Create(ctx context.Context, space *types.Space) error {
 			,:space_uid
 			,:space_description
 			,:space_root_space_id
+			,:space_root_space_identifier
 			,:space_created_by
 			,:space_created
 			,:space_updated
@@ -495,13 +499,14 @@ func (s *SpaceStore) Update(ctx context.Context, space *types.Space) error {
 	const sqlQuery = `
 		UPDATE spaces
 		SET
-		    space_version		= :space_version
-			,space_updated		= :space_updated
-			,space_parent_id	= :space_parent_id
-			,space_uid			= :space_uid
-			,space_description	= :space_description
-			,space_root_space_id	= :space_root_space_id
-			,space_deleted 		= :space_deleted
+		    space_version					= :space_version
+			,space_updated					= :space_updated
+			,space_parent_id				= :space_parent_id
+			,space_uid						= :space_uid
+			,space_description				= :space_description
+			,space_root_space_id			= :space_root_space_id
+			,space_root_space_identifier	= :space_root_space_identifier
+			,space_deleted					= :space_deleted
 		WHERE space_id = :space_id AND space_version = :space_version - 1`
 
 	dbSpace := mapToInternalSpace(space)
@@ -941,15 +946,16 @@ func mapToSpace(
 ) (*types.Space, error) {
 	var err error
 	res := &types.Space{
-		ID:          in.ID,
-		Version:     in.Version,
-		Identifier:  in.Identifier,
-		Description: in.Description,
-		RootSpaceID: in.RootSpaceID,
-		Created:     in.Created,
-		CreatedBy:   in.CreatedBy,
-		Updated:     in.Updated,
-		Deleted:     in.Deleted.Ptr(),
+		ID:                  in.ID,
+		Version:             in.Version,
+		Identifier:          in.Identifier,
+		Description:         in.Description,
+		RootSpaceID:         in.RootSpaceID,
+		RootSpaceIdentifier: in.RootSpaceIdentifier,
+		Created:             in.Created,
+		CreatedBy:           in.CreatedBy,
+		Updated:             in.Updated,
+		Deleted:             in.Deleted.Ptr(),
 	}
 
 	// Only overwrite ParentID if it's not a root space
@@ -1002,15 +1008,16 @@ func (s *SpaceStore) mapToSpaces(
 
 func mapToInternalSpace(s *types.Space) *space {
 	res := &space{
-		ID:          s.ID,
-		Version:     s.Version,
-		Identifier:  s.Identifier,
-		Description: s.Description,
-		RootSpaceID: s.RootSpaceID,
-		Created:     s.Created,
-		CreatedBy:   s.CreatedBy,
-		Updated:     s.Updated,
-		Deleted:     null.IntFromPtr(s.Deleted),
+		ID:                  s.ID,
+		Version:             s.Version,
+		Identifier:          s.Identifier,
+		Description:         s.Description,
+		RootSpaceID:         s.RootSpaceID,
+		RootSpaceIdentifier: s.RootSpaceIdentifier,
+		Created:             s.Created,
+		CreatedBy:           s.CreatedBy,
+		Updated:             s.Updated,
+		Deleted:             null.IntFromPtr(s.Deleted),
 	}
 
 	// Only overwrite ParentID if it's not a root space

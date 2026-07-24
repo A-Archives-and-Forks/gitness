@@ -108,8 +108,19 @@ func (c *Controller) createSpaceInnerInTX(
 ) (*types.Space, error) {
 	parentID := parentSpace.ID
 	spacePath := in.Identifier
+	// for root spaces the root id/identifier is the space's own id/identifier,
+	// for child spaces they are inherited from the parent.
+	rootSpaceID := int64(0)
+	rootSpaceIdentifier := in.Identifier
 	if parentID > 0 {
-		// (re-)read parent path in transaction to ensure correctness
+		// (re-)read parent in transaction to ensure correctness
+		parentSpaceFull, err := c.spaceStore.Find(ctx, parentID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find parent space '%d': %w", parentID, err)
+		}
+		rootSpaceID = parentSpaceFull.RootSpaceID
+		rootSpaceIdentifier = parentSpaceFull.RootSpaceIdentifier
+
 		parentPath, err := c.spacePathStore.FindPrimaryBySpaceID(ctx, parentID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to find primary path for parent '%d': %w", parentID, err)
@@ -125,15 +136,16 @@ func (c *Controller) createSpaceInnerInTX(
 
 	now := time.Now().UnixMilli()
 	space := &types.Space{
-		Version:     0,
-		ParentID:    parentID,
-		RootSpaceID: parentSpace.RootSpaceID,
-		Identifier:  in.Identifier,
-		Description: in.Description,
-		Path:        spacePath,
-		CreatedBy:   session.Principal.ID,
-		Created:     now,
-		Updated:     now,
+		Version:             0,
+		ParentID:            parentID,
+		RootSpaceID:         rootSpaceID,
+		RootSpaceIdentifier: rootSpaceIdentifier,
+		Identifier:          in.Identifier,
+		Description:         in.Description,
+		Path:                spacePath,
+		CreatedBy:           session.Principal.ID,
+		Created:             now,
+		Updated:             now,
 	}
 
 	err := c.spaceStore.Create(ctx, space)

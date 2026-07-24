@@ -62,17 +62,18 @@ type RepoStore struct {
 }
 
 type repository struct {
-	ID          int64    `db:"repo_id"`
-	Version     int64    `db:"repo_version"`
-	ParentID    int64    `db:"repo_parent_id"`
-	Identifier  string   `db:"repo_uid"`
-	Description string   `db:"repo_description"`
-	RootSpaceID int64    `db:"repo_root_space_id"`
-	CreatedBy   int64    `db:"repo_created_by"`
-	Created     int64    `db:"repo_created"`
-	Updated     int64    `db:"repo_updated"`
-	Deleted     null.Int `db:"repo_deleted"`
-	LastGITPush int64    `db:"repo_last_git_push"`
+	ID                  int64    `db:"repo_id"`
+	Version             int64    `db:"repo_version"`
+	ParentID            int64    `db:"repo_parent_id"`
+	Identifier          string   `db:"repo_uid"`
+	Description         string   `db:"repo_description"`
+	RootSpaceID         int64    `db:"repo_root_space_id"`
+	RootSpaceIdentifier string   `db:"repo_root_space_identifier"`
+	CreatedBy           int64    `db:"repo_created_by"`
+	Created             int64    `db:"repo_created"`
+	Updated             int64    `db:"repo_updated"`
+	Deleted             null.Int `db:"repo_deleted"`
+	LastGITPush         int64    `db:"repo_last_git_push"`
 
 	Size        int64 `db:"repo_size"`
 	SizeLFS     int64 `db:"repo_lfs_size"`
@@ -108,6 +109,7 @@ const (
 		,repo_uid
 		,repo_description
 		,repo_root_space_id
+		,repo_root_space_identifier
 		,repo_created_by
 		,repo_created
 		,repo_updated
@@ -254,6 +256,7 @@ func (s *RepoStore) Create(ctx context.Context, repo *types.Repository) error {
 			,repo_type
 			,repo_language
 			,repo_root_space_id
+			,repo_root_space_identifier
 		) values (
 			:repo_version
 			,:repo_parent_id
@@ -282,6 +285,7 @@ func (s *RepoStore) Create(ctx context.Context, repo *types.Repository) error {
 			,:repo_type
 			,:repo_language
 			,:repo_root_space_id
+			,:repo_root_space_identifier
 		) RETURNING repo_id`
 
 	db := dbtx.GetAccessor(ctx, s.db)
@@ -901,34 +905,35 @@ func (s *RepoStore) mapToRepo(
 	}
 
 	res := &types.Repository{
-		ID:             in.ID,
-		Version:        in.Version,
-		ParentID:       in.ParentID,
-		Identifier:     in.Identifier,
-		Description:    in.Description,
-		RootSpaceID:    in.RootSpaceID,
-		Created:        in.Created,
-		CreatedBy:      in.CreatedBy,
-		Updated:        in.Updated,
-		Deleted:        in.Deleted.Ptr(),
-		LastGITPush:    in.LastGITPush,
-		Size:           in.Size,
-		LFSSize:        in.SizeLFS,
-		SizeUpdated:    in.SizeUpdated,
-		GitUID:         in.GitUID,
-		DefaultBranch:  in.DefaultBranch,
-		ForkID:         in.ForkID.Int64,
-		PullReqSeq:     in.PullReqSeq,
-		NumForks:       in.NumForks,
-		NumPulls:       in.NumPulls,
-		NumClosedPulls: in.NumClosedPulls,
-		NumOpenPulls:   in.NumOpenPulls,
-		NumMergedPulls: in.NumMergedPulls,
-		State:          in.State,
-		IsEmpty:        in.IsEmpty,
-		Tags:           in.Tags,
-		Type:           t,
-		Language:       in.Language,
+		ID:                  in.ID,
+		Version:             in.Version,
+		ParentID:            in.ParentID,
+		Identifier:          in.Identifier,
+		Description:         in.Description,
+		RootSpaceID:         in.RootSpaceID,
+		RootSpaceIdentifier: in.RootSpaceIdentifier,
+		Created:             in.Created,
+		CreatedBy:           in.CreatedBy,
+		Updated:             in.Updated,
+		Deleted:             in.Deleted.Ptr(),
+		LastGITPush:         in.LastGITPush,
+		Size:                in.Size,
+		LFSSize:             in.SizeLFS,
+		SizeUpdated:         in.SizeUpdated,
+		GitUID:              in.GitUID,
+		DefaultBranch:       in.DefaultBranch,
+		ForkID:              in.ForkID.Int64,
+		PullReqSeq:          in.PullReqSeq,
+		NumForks:            in.NumForks,
+		NumPulls:            in.NumPulls,
+		NumClosedPulls:      in.NumClosedPulls,
+		NumOpenPulls:        in.NumOpenPulls,
+		NumMergedPulls:      in.NumMergedPulls,
+		State:               in.State,
+		IsEmpty:             in.IsEmpty,
+		Tags:                in.Tags,
+		Type:                t,
+		Language:            in.Language,
 		// Path: is set below
 	}
 
@@ -994,33 +999,34 @@ func (s *RepoStore) mapToRepoSizes(
 
 func mapToInternalRepo(in *types.Repository) *repository {
 	return &repository{
-		ID:             in.ID,
-		Version:        in.Version,
-		ParentID:       in.ParentID,
-		Identifier:     in.Identifier,
-		Description:    in.Description,
-		RootSpaceID:    in.RootSpaceID,
-		Created:        in.Created,
-		CreatedBy:      in.CreatedBy,
-		Updated:        in.Updated,
-		Deleted:        null.IntFromPtr(in.Deleted),
-		LastGITPush:    in.LastGITPush,
-		Size:           in.Size,
-		SizeUpdated:    in.SizeUpdated,
-		GitUID:         in.GitUID,
-		DefaultBranch:  in.DefaultBranch,
-		ForkID:         null.NewInt(in.ForkID, true),
-		PullReqSeq:     in.PullReqSeq,
-		NumForks:       in.NumForks,
-		NumPulls:       in.NumPulls,
-		NumClosedPulls: in.NumClosedPulls,
-		NumOpenPulls:   in.NumOpenPulls,
-		NumMergedPulls: in.NumMergedPulls,
-		State:          in.State,
-		IsEmpty:        in.IsEmpty,
-		Tags:           in.Tags,
-		Type:           null.NewString(string(in.Type), in.Type != ""),
-		Language:       in.Language,
+		ID:                  in.ID,
+		Version:             in.Version,
+		ParentID:            in.ParentID,
+		Identifier:          in.Identifier,
+		Description:         in.Description,
+		RootSpaceID:         in.RootSpaceID,
+		RootSpaceIdentifier: in.RootSpaceIdentifier,
+		Created:             in.Created,
+		CreatedBy:           in.CreatedBy,
+		Updated:             in.Updated,
+		Deleted:             null.IntFromPtr(in.Deleted),
+		LastGITPush:         in.LastGITPush,
+		Size:                in.Size,
+		SizeUpdated:         in.SizeUpdated,
+		GitUID:              in.GitUID,
+		DefaultBranch:       in.DefaultBranch,
+		ForkID:              null.NewInt(in.ForkID, true),
+		PullReqSeq:          in.PullReqSeq,
+		NumForks:            in.NumForks,
+		NumPulls:            in.NumPulls,
+		NumClosedPulls:      in.NumClosedPulls,
+		NumOpenPulls:        in.NumOpenPulls,
+		NumMergedPulls:      in.NumMergedPulls,
+		State:               in.State,
+		IsEmpty:             in.IsEmpty,
+		Tags:                in.Tags,
+		Type:                null.NewString(string(in.Type), in.Type != ""),
+		Language:            in.Language,
 	}
 }
 

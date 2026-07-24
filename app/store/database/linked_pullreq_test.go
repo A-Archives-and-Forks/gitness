@@ -81,10 +81,11 @@ func insertPullReqRaw(
 		,pullreq_merge_base_sha
 		,pullreq_type
 		,pullreq_root_space_id
+		,pullreq_root_space_identifier
 	) VALUES (
 		?, 0, ?, ?, ?, ?, ?, 'open', ?, '',
 		?, ?, ?, ?, ?,
-		'unchecked', '', ?, ?
+		'unchecked', '', ?, ?, ?
 	)`
 
 	var typeVal interface{}
@@ -99,7 +100,7 @@ func insertPullReqRaw(
 	if _, err := db.ExecContext(ctx, q,
 		pullReqID, userID, now, now, now,
 		number, fmt.Sprintf("Test PR %d", pullReqID),
-		repoID, sourceBranch, sourceSHA, repoID, targetBranch, typeVal, 1,
+		repoID, sourceBranch, sourceSHA, repoID, targetBranch, typeVal, 1, "root",
 	); err != nil {
 		t.Fatalf("insertPullReqRaw: %v", err)
 	}

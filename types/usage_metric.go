@@ -17,11 +17,12 @@ package types
 import "time"
 
 type UsageMetric struct {
-	Date            time.Time `json:"-"`
-	RootSpaceID     int64     `json:"root_space_id"`
-	BandwidthOut    int64     `json:"bandwidth_out"`
-	BandwidthIn     int64     `json:"bandwidth_in"`
-	StorageTotal    int64     `json:"storage_total"`
-	LFSStorageTotal int64     `json:"lfs_storage_total"`
-	Pushes          int64     `json:"pushes"`
+	Date                time.Time `json:"-"`
+	RootSpaceID         int64     `json:"root_space_id"`
+	RootSpaceIdentifier string    `json:"root_space_identifier"`
+	BandwidthOut        int64     `json:"bandwidth_out"`
+	BandwidthIn         int64     `json:"bandwidth_in"`
+	StorageTotal        int64     `json:"storage_total"`
+	LFSStorageTotal     int64     `json:"lfs_storage_total"`
+	Pushes              int64     `json:"pushes"`
 }

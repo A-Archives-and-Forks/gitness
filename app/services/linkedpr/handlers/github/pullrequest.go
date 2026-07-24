@@ -210,32 +210,33 @@ func (h *PullRequestHandler) create(
 	// SourceRepoID intentionally equals TargetRepoID.
 	srcRepoID := linkedRepo.RepoID
 
-	repo, err := h.repoFinder.FindByID(ctx, linkedRepo.RepoID)
+	repo, err := h.repoStore.Find(ctx, linkedRepo.RepoID)
 	if err != nil {
 		return fmt.Errorf("failed to find repo for linked PR: %w", err)
 	}
 
 	prType := enum.PullReqTypeLinked
 	parent := &types.PullReq{
-		Number:           int64(prPayload.Number),
-		CreatedBy:        authorPrincipalID,
-		Created:          firstNonZero(prPayload.CreatedAt, now),
-		Updated:          firstNonZero(prPayload.UpdatedAt, now),
-		Edited:           firstNonZero(prPayload.UpdatedAt, now),
-		State:            prPayload.State,
-		IsDraft:          prPayload.Draft,
-		Title:            prPayload.Title,
-		Description:      prPayload.Description,
-		SourceRepoID:     &srcRepoID,
-		SourceBranch:     prPayload.HeadRef,
-		SourceSHA:        prPayload.HeadSHA,
-		TargetRepoID:     linkedRepo.RepoID,
-		TargetBranch:     prPayload.BaseRef,
-		RootSpaceID:      repo.RootSpaceID,
-		MergeTargetSHA:   ptr.String(prPayload.BaseSHA),
-		MergeBaseSHA:     mergeBaseSHA,
-		MergeCheckStatus: enum.MergeCheckStatusUnchecked,
-		Type:             &prType,
+		Number:              int64(prPayload.Number),
+		CreatedBy:           authorPrincipalID,
+		Created:             firstNonZero(prPayload.CreatedAt, now),
+		Updated:             firstNonZero(prPayload.UpdatedAt, now),
+		Edited:              firstNonZero(prPayload.UpdatedAt, now),
+		State:               prPayload.State,
+		IsDraft:             prPayload.Draft,
+		Title:               prPayload.Title,
+		Description:         prPayload.Description,
+		SourceRepoID:        &srcRepoID,
+		SourceBranch:        prPayload.HeadRef,
+		SourceSHA:           prPayload.HeadSHA,
+		TargetRepoID:        linkedRepo.RepoID,
+		TargetBranch:        prPayload.BaseRef,
+		RootSpaceID:         repo.RootSpaceID,
+		RootSpaceIdentifier: repo.RootSpaceIdentifier,
+		MergeTargetSHA:      ptr.String(prPayload.BaseSHA),
+		MergeBaseSHA:        mergeBaseSHA,
+		MergeCheckStatus:    enum.MergeCheckStatusUnchecked,
+		Type:                &prType,
 	}
 	if prPayload.State == enum.PullReqStateClosed || prPayload.State == enum.PullReqStateMerged {
 		// UpdatedAt stands in for closed_at/merged_at — proto exposes neither.

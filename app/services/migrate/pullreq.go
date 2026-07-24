@@ -112,6 +112,8 @@ type repoImportState struct {
 	labelValues                 map[int64]map[string]*int64 // map for label values {label.id:{"value-key":value-id,}}
 	migrator                    types.Principal
 	scope                       int64 // depth of space used for labels
+	rootSpaceID                 int64
+	rootSpaceIdentifier         string
 }
 
 // Import load provided pull requests in go-scm format and imports them.
@@ -124,6 +126,11 @@ func (migrate PullReq) Import(
 	extPullReqs []*ExternalPullRequest,
 ) ([]*types.PullReq, error) {
 	readParams := git.ReadParams{RepoUID: repo.GitUID}
+
+	repoFull, err := migrate.repoStore.Find(ctx, repo.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find repo for pull request import: %w", err)
+	}
 
 	repoState := repoImportState{
 		git:                         migrate.git,
@@ -144,6 +151,8 @@ func (migrate PullReq) Import(
 		labelValues:                 map[int64]map[string]*int64{},
 		migrator:                    migrator,
 		scope:                       0,
+		rootSpaceID:                 repoFull.RootSpaceID,
+		rootSpaceIdentifier:         repoFull.RootSpaceIdentifier,
 	}
 
 	pullReqUnique := map[int]ExternalPullRequest{}
@@ -172,7 +181,7 @@ func (migrate PullReq) Import(
 		return nil, nil
 	}
 
-	err := migrate.tx.WithTx(ctx, func(ctx context.Context) error {
+	err = migrate.tx.WithTx(ctx, func(ctx context.Context) error {
 		var deltaOpen, deltaClosed, deltaMerged int
 		var maxNumber int64
 
@@ -303,27 +312,28 @@ func (r *repoImportState) convertPullReq(
 	}
 
 	pr := &types.PullReq{
-		ID:              0, // the ID will be populated in the data layer
-		Version:         0,
-		Number:          int64(extPullReq.Number),
-		CreatedBy:       author.ID,
-		Created:         createdAt,
-		Updated:         updatedAt,
-		Edited:          updatedAt,
-		Closed:          nil,
-		State:           enum.PullReqStateOpen,
-		IsDraft:         extPullReq.Draft,
-		CommentCount:    0,
-		UnresolvedCount: 0,
-		Title:           extPullReq.Title,
-		Description:     extPullReq.Body,
-		SourceRepoID:    &repo.ID,
-		SourceBranch:    extPullReq.Head.Name,
-		SourceSHA:       extPullReq.Head.SHA,
-		TargetRepoID:    repo.ID,
-		TargetBranch:    extPullReq.Base.Name,
-		RootSpaceID:     repo.RootSpaceID,
-		ActivitySeq:     0,
+		ID:                  0, // the ID will be populated in the data layer
+		Version:             0,
+		Number:              int64(extPullReq.Number),
+		CreatedBy:           author.ID,
+		Created:             createdAt,
+		Updated:             updatedAt,
+		Edited:              updatedAt,
+		Closed:              nil,
+		State:               enum.PullReqStateOpen,
+		IsDraft:             extPullReq.Draft,
+		CommentCount:        0,
+		UnresolvedCount:     0,
+		Title:               extPullReq.Title,
+		Description:         extPullReq.Body,
+		SourceRepoID:        &repo.ID,
+		SourceBranch:        extPullReq.Head.Name,
+		SourceSHA:           extPullReq.Head.SHA,
+		TargetRepoID:        repo.ID,
+		TargetBranch:        extPullReq.Base.Name,
+		RootSpaceID:         r.rootSpaceID,
+		RootSpaceIdentifier: r.rootSpaceIdentifier,
+		ActivitySeq:         0,
 		// Merge related fields are all left unset and will be set depending on the PR state
 	}
 

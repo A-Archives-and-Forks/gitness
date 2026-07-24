@@ -68,18 +68,19 @@ func (c *Controller) Import(ctx context.Context, session *auth.Session, in *Impo
 		&session.Principal,
 	)
 
-	repo.RootSpaceID = parentSpace.RootSpaceID
-
 	err = c.tx.WithTx(ctx, func(ctx context.Context) error {
 		if err := c.resourceLimiter.RepoCount(ctx, parentSpace.ID, 1); err != nil {
 			return fmt.Errorf("resource limit exceeded: %w", limiter.ErrMaxNumReposReached)
 		}
 
 		// lock the space for update during repo creation to prevent racing conditions with space soft delete.
-		_, err = c.spaceStore.FindForUpdate(ctx, parentSpace.ID)
+		parentSpaceFull, err := c.spaceStore.FindForUpdate(ctx, parentSpace.ID)
 		if err != nil {
 			return fmt.Errorf("failed to find the parent space: %w", err)
 		}
+
+		repo.RootSpaceID = parentSpaceFull.RootSpaceID
+		repo.RootSpaceIdentifier = parentSpaceFull.RootSpaceIdentifier
 
 		err = c.repoStore.Create(ctx, repo)
 		if errors.Is(err, store.ErrDuplicate) {

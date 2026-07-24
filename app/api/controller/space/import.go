@@ -96,6 +96,7 @@ func (c *Controller) Import(ctx context.Context, session *auth.Session, in *Impo
 				&session.Principal,
 			)
 			repo.RootSpaceID = space.RootSpaceID
+			repo.RootSpaceIdentifier = space.RootSpaceIdentifier
 
 			err = c.repoStore.Create(ctx, repo)
 			if err != nil {

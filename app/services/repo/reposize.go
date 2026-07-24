@@ -157,10 +157,11 @@ func (s *SizeCalculator) sendMetric(
 	metrics := make([]*types.UsageMetric, len(spaces))
 	for i, rootSpace := range spaces {
 		metrics[i] = &types.UsageMetric{
-			Date:            date,
-			RootSpaceID:     rootSpace.ID,
-			StorageTotal:    rootSpace.Size,
-			LFSStorageTotal: rootSpace.LFSSize,
+			Date:                date,
+			RootSpaceID:         rootSpace.ID,
+			RootSpaceIdentifier: rootSpace.Identifier,
+			StorageTotal:        rootSpace.Size,
+			LFSStorageTotal:     rootSpace.LFSSize,
 		}
 	}
 

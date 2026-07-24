@@ -56,10 +56,11 @@ type PullReqStore struct {
 // pullReq is used to fetch pull request data from the database.
 // The object should be later re-packed into a different struct to return it as an API response.
 type pullReq struct {
-	ID          int64 `db:"pullreq_id"`
-	Version     int64 `db:"pullreq_version"`
-	Number      int64 `db:"pullreq_number"`
-	RootSpaceID int64 `db:"pullreq_root_space_id"`
+	ID                  int64  `db:"pullreq_id"`
+	Version             int64  `db:"pullreq_version"`
+	Number              int64  `db:"pullreq_number"`
+	RootSpaceID         int64  `db:"pullreq_root_space_id"`
+	RootSpaceIdentifier string `db:"pullreq_root_space_identifier"`
 
 	CreatedBy int64    `db:"pullreq_created_by"`
 	Created   int64    `db:"pullreq_created"`
@@ -113,6 +114,7 @@ const (
 		,pullreq_version
 		,pullreq_number
 		,pullreq_root_space_id
+		,pullreq_root_space_identifier
 		,pullreq_created_by
 		,pullreq_created
 		,pullreq_updated
@@ -249,6 +251,7 @@ func (s *PullReqStore) Create(ctx context.Context, pr *types.PullReq) error {
 		,pullreq_deletions
 		,pullreq_type
 		,pullreq_root_space_id
+		,pullreq_root_space_identifier
 	) values (
 		 :pullreq_version
 		,:pullreq_number
@@ -287,6 +290,7 @@ func (s *PullReqStore) Create(ctx context.Context, pr *types.PullReq) error {
 		,:pullreq_deletions
 		,:pullreq_type
 		,:pullreq_root_space_id
+		,:pullreq_root_space_identifier
 	) RETURNING pullreq_id`
 
 	db := dbtx.GetAccessor(ctx, s.db)
@@ -912,6 +916,7 @@ func mapPullReq(pr *pullReq) *types.PullReq {
 		Version:                 pr.Version,
 		Number:                  pr.Number,
 		RootSpaceID:             pr.RootSpaceID,
+		RootSpaceIdentifier:     pr.RootSpaceIdentifier,
 		CreatedBy:               pr.CreatedBy,
 		Created:                 pr.Created,
 		Updated:                 pr.Updated,
@@ -965,6 +970,7 @@ func mapInternalPullReq(pr *types.PullReq) *pullReq {
 		Version:                 pr.Version,
 		Number:                  pr.Number,
 		RootSpaceID:             pr.RootSpaceID,
+		RootSpaceIdentifier:     pr.RootSpaceIdentifier,
 		CreatedBy:               pr.CreatedBy,
 		Created:                 pr.Created,
 		Updated:                 pr.Updated,

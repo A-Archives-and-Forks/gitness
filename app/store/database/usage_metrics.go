@@ -30,15 +30,16 @@ import (
 var _ store.UsageMetricStore = (*UsageMetricsStore)(nil)
 
 type usageMetric struct {
-	RootSpaceID     int64 `db:"usage_metric_space_id"`
-	Date            int64 `db:"usage_metric_date"`
-	Created         int64 `db:"usage_metric_created"`
-	Updated         int64 `db:"usage_metric_updated"`
-	BandwidthOut    int64 `db:"usage_metric_bandwidth_out"`
-	BandwidthIn     int64 `db:"usage_metric_bandwidth_in"`
-	StorageTotal    int64 `db:"usage_metric_storage_total"`
-	LFSStorageTotal int64 `db:"usage_metric_lfs_storage_total"`
-	Pushes          int64 `db:"usage_metric_pushes"`
+	RootSpaceID         int64  `db:"usage_metric_space_id"`
+	RootSpaceIdentifier string `db:"usage_metric_space_identifier"`
+	Date                int64  `db:"usage_metric_date"`
+	Created             int64  `db:"usage_metric_created"`
+	Updated             int64  `db:"usage_metric_updated"`
+	BandwidthOut        int64  `db:"usage_metric_bandwidth_out"`
+	BandwidthIn         int64  `db:"usage_metric_bandwidth_in"`
+	StorageTotal        int64  `db:"usage_metric_storage_total"`
+	LFSStorageTotal     int64  `db:"usage_metric_lfs_storage_total"`
+	Pushes              int64  `db:"usage_metric_pushes"`
 }
 
 // NewUsageMetricsStore returns a new UsageMetricsStore.
@@ -64,6 +65,7 @@ func (s *UsageMetricsStore) Upsert(
 	sqlQuery := `
 		INSERT INTO usage_metrics (
         	usage_metric_space_id
+			,usage_metric_space_identifier
 			,usage_metric_date
 			,usage_metric_created
 			,usage_metric_updated
@@ -72,6 +74,7 @@ func (s *UsageMetricsStore) Upsert(
 			,usage_metric_pushes
 		) VALUES (
 			:usage_metric_space_id
+			,:usage_metric_space_identifier
 		    ,:usage_metric_date
 		    ,:usage_metric_created
 		    ,:usage_metric_updated
@@ -97,13 +100,14 @@ func (s *UsageMetricsStore) Upsert(
 			today = s.Date(m.Date)
 		}
 		usageMetrics[i] = usageMetric{
-			RootSpaceID:  m.RootSpaceID,
-			Date:         today,
-			Created:      now.UnixMilli(),
-			Updated:      now.UnixMilli(),
-			BandwidthOut: m.BandwidthOut,
-			BandwidthIn:  m.BandwidthIn,
-			Pushes:       m.Pushes,
+			RootSpaceID:         m.RootSpaceID,
+			RootSpaceIdentifier: m.RootSpaceIdentifier,
+			Date:                today,
+			Created:             now.UnixMilli(),
+			Updated:             now.UnixMilli(),
+			BandwidthOut:        m.BandwidthOut,
+			BandwidthIn:         m.BandwidthIn,
+			Pushes:              m.Pushes,
 		}
 	}
 
@@ -132,6 +136,7 @@ func (s *UsageMetricsStore) UpsertStorage(
 	sqlQuery := `
 		INSERT INTO usage_metrics (
         	usage_metric_space_id
+			,usage_metric_space_identifier
 			,usage_metric_date
 			,usage_metric_created
 			,usage_metric_updated
@@ -139,6 +144,7 @@ func (s *UsageMetricsStore) UpsertStorage(
 			,usage_metric_lfs_storage_total
 		) VALUES (
 			:usage_metric_space_id
+			,:usage_metric_space_identifier
 		    ,:usage_metric_date
 		    ,:usage_metric_created
 		    ,:usage_metric_updated
@@ -162,12 +168,13 @@ func (s *UsageMetricsStore) UpsertStorage(
 			today = s.Date(m.Date)
 		}
 		usageMetrics[i] = usageMetric{
-			RootSpaceID:     m.RootSpaceID,
-			Date:            today,
-			Created:         now.UnixMilli(),
-			Updated:         now.UnixMilli(),
-			StorageTotal:    m.StorageTotal,
-			LFSStorageTotal: m.LFSStorageTotal,
+			RootSpaceID:         m.RootSpaceID,
+			RootSpaceIdentifier: m.RootSpaceIdentifier,
+			Date:                today,
+			Created:             now.UnixMilli(),
+			Updated:             now.UnixMilli(),
+			StorageTotal:        m.StorageTotal,
+			LFSStorageTotal:     m.LFSStorageTotal,
 		}
 	}
 

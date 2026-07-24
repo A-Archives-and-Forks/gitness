@@ -148,7 +148,7 @@ func (c *Controller) CreateFork(
 		}
 
 		// lock the space for update during repo creation to prevent racing conditions with space soft delete.
-		_, err = c.spaceStore.FindForUpdate(ctx, parentSpace.ID)
+		parentSpaceFull, err := c.spaceStore.FindForUpdate(ctx, parentSpace.ID)
 		if err != nil {
 			return fmt.Errorf("failed to find the parent space: %w", err)
 		}
@@ -160,21 +160,22 @@ func (c *Controller) CreateFork(
 
 		now := time.Now().UnixMilli()
 		repoFork = &types.Repository{
-			Version:       0,
-			ParentID:      parentSpace.ID,
-			RootSpaceID:   parentSpace.RootSpaceID,
-			Identifier:    in.Identifier,
-			GitUID:        gitForkRepo.UID,
-			Description:   repoUpstream.Description,
-			CreatedBy:     session.Principal.ID,
-			Created:       now,
-			Updated:       now,
-			LastGITPush:   now,
-			ForkID:        repoUpstream.ID,
-			DefaultBranch: defaultBranch,
-			IsEmpty:       false,
-			State:         enum.RepoStateGitImport,
-			Tags:          json.RawMessage(`{}`),
+			Version:             0,
+			ParentID:            parentSpace.ID,
+			RootSpaceID:         parentSpaceFull.RootSpaceID,
+			RootSpaceIdentifier: parentSpaceFull.RootSpaceIdentifier,
+			Identifier:          in.Identifier,
+			GitUID:              gitForkRepo.UID,
+			Description:         repoUpstream.Description,
+			CreatedBy:           session.Principal.ID,
+			Created:             now,
+			Updated:             now,
+			LastGITPush:         now,
+			ForkID:              repoUpstream.ID,
+			DefaultBranch:       defaultBranch,
+			IsEmpty:             false,
+			State:               enum.RepoStateGitImport,
+			Tags:                json.RawMessage(`{}`),
 		}
 
 		err = c.repoStore.Create(ctx, repoFork)

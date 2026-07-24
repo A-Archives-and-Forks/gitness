@@ -180,13 +180,14 @@ func (m *Mediator) process(ctx context.Context, payload []*Metric) {
 		}
 
 		metrics[i] = &types.UsageMetric{
-			Date:            metric.Time,
-			RootSpaceID:     space.ID,
-			BandwidthOut:    metric.Out,
-			BandwidthIn:     metric.In,
-			StorageTotal:    metric.StorageTotal,
-			LFSStorageTotal: metric.LFSStorageTotal,
-			Pushes:          metric.Pushes,
+			Date:                metric.Time,
+			RootSpaceID:         space.ID,
+			RootSpaceIdentifier: space.Identifier,
+			BandwidthOut:        metric.Out,
+			BandwidthIn:         metric.In,
+			StorageTotal:        metric.StorageTotal,
+			LFSStorageTotal:     metric.LFSStorageTotal,
+			Pushes:              metric.Pushes,
 		}
 	}
 

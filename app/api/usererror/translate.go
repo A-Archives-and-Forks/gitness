@@ -44,6 +44,7 @@ func Translate(ctx context.Context, err error) *Error {
 		codeOwnersFileParseError     *codeowners.FileParseError
 		codeOwnersInvalidFileTypeErr *codeowners.InvalidFileTypeError
 		lockError                    *lock.Error
+		totalQuotaStorageErr         *limiter.TotalQuotaStorageError
 	)
 
 	// print original error for debugging purposes
@@ -84,6 +85,12 @@ func Translate(ctx context.Context, err error) *Error {
 		return ErrSpaceWithChildsCantBeDeleted
 	case errors.Is(err, limiter.ErrMaxNumReposReached):
 		return Forbidden(err.Error())
+	// Only the blocking level is a rejection. The advisory ones are filtered out where the
+	// limiter is called, because they are meant for the push output, so one arriving here
+	// is a bug and is left to fall through to an internal error rather than be reported to
+	// the user as a limit that stopped them.
+	case errors.As(err, &totalQuotaStorageErr) && totalQuotaStorageErr.Blocked():
+		return Forbidden(totalQuotaStorageErr.UserMessage())
 
 	//	upload errors
 	case errors.Is(err, blob.ErrNotFound):

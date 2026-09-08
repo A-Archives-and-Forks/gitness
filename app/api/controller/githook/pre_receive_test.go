@@ -15,6 +15,7 @@
 package githook
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -27,12 +28,16 @@ import (
 	"github.com/harness/gitness/types"
 	"github.com/harness/gitness/types/enum"
 
+	"github.com/fatih/color"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 const testRepoID int64 = 42
 const testSpaceID int64 = 7
+
+const mib = int64(1024 * 1024)
 
 // rootSpaceStorageCall records the arguments of a single RootSpaceStorage call.
 type rootSpaceStorageCall struct {
@@ -59,10 +64,10 @@ func (l *limiterMock) RepoSize(_ context.Context, repoID int64) error {
 	return l.repoSizeErr
 }
 
-func (l *limiterMock) RootSpaceStorage(_ context.Context, spaceID int64, additionalKiB int64) error {
+func (l *limiterMock) RootSpaceStorage(_ context.Context, spaceID int64) error {
 	l.rootSpaceStorageCalls = append(
 		l.rootSpaceStorageCalls,
-		rootSpaceStorageCall{spaceID: spaceID, additionalKiB: additionalKiB},
+		rootSpaceStorageCall{spaceID: spaceID},
 	)
 	return l.rootSpaceStorageErr
 }
@@ -111,85 +116,195 @@ func newTestRepo() *types.RepositoryCore {
 	}
 }
 
-// TestPreReceive_StorageLimits covers how PreReceive translates the limiter
-// results into hook output: hard limits block the push with a user facing
-// message, soft limits only warn, and unexpected failures bubble up as errors.
+// repoQuotaErr is the verdict the limiter returns for a repository of sizeMiB, against a
+// 30 MiB advisory limit and a 60 MiB hard one.
+func repoQuotaErr(level limiter.RepoQuotaStorageLevel, sizeMiB int64) error {
+	return &limiter.RepoQuotaStorageError{
+		Level:     level,
+		Size:      sizeMiB * mib,
+		SoftLimit: 30 * mib,
+		HardLimit: 60 * mib,
+	}
+}
+
+// totalQuotaErr is the verdict the limiter returns for a root space using sizeMiB of a
+// 50 MiB limit, warning at 80% of it and turning critical at 95%.
+func totalQuotaErr(level limiter.TotalQuotaStorageLevel, sizeMiB int64) error {
+	return &limiter.TotalQuotaStorageError{
+		Level:           level,
+		Size:            sizeMiB * mib,
+		Limit:           50 * mib,
+		WarnPercent:     80,
+		CriticalPercent: 95,
+	}
+}
+
+// archivedRejection is the rejection an archived repository earns after the quota checks.
+// The quota tests push to an archived repository on purpose: it forces an exit that
+// preserves output.Messages, which is the only way to see a warning that does not block.
+func archivedRejection() *string {
+	return strPtr(
+		fmt.Sprintf("Push not allowed when repository is in '%s' state", enum.RepoStateArchived),
+	)
+}
+
+// TestPreReceive_StorageLimits covers how PreReceive turns the limiter's verdicts into hook
+// output. The bars are compared verbatim because they are written straight into git's push
+// output, so a change to one is visible to every pusher.
 func TestPreReceive_StorageLimits(t *testing.T) {
-	unexpectedErr := errors.New("boom")
+	// The bars are compared verbatim, so they must not depend on the terminal the test
+	// happens to run in.
+	color.NoColor = true
 
 	tests := []struct {
 		name                string
 		repoSizeErr         error
 		rootSpaceStorageErr error
-		// repoState is used to force an early exit that preserves output.Messages.
+		// repoState and opType decide where PreReceive exits, which is what determines
+		// whether accumulated messages survive.
 		repoState        enum.RepoState
 		opType           enum.GitOpType
-		expectedErr      string
 		expectedOutErr   *string
 		expectedMessages []string
-		// expectRootStorageCall is false when the repo size check short circuits.
-		expectRootStorageCall bool
 	}{
 		{
-			name:                  "within limits",
-			repoState:             enum.RepoStateActive,
-			opType:                enum.GitOpTypeAPIRefsOnly,
-			expectRootStorageCall: true,
-		},
-		{
-			name:                  "repo size hard limit blocks push",
-			repoSizeErr:           limiter.ErrMaxRepoSizeReached,
-			repoState:             enum.RepoStateActive,
-			opType:                enum.GitOpTypeAPIRefsOnly,
-			expectedOutErr:        strPtr(limiter.ErrMaxRepoSizeReached.Error()),
-			expectRootStorageCall: false,
-		},
-		{
-			name: "repo size hard limit blocks push when wrapped",
-			repoSizeErr: fmt.Errorf(
-				"repo 42: %w", limiter.ErrMaxRepoSizeReached,
-			),
-			repoState:             enum.RepoStateActive,
-			opType:                enum.GitOpTypeAPIRefsOnly,
-			expectedOutErr:        strPtr("repo 42: " + limiter.ErrMaxRepoSizeReached.Error()),
-			expectRootStorageCall: false,
+			name:      "within limits",
+			repoState: enum.RepoStateActive,
+			opType:    enum.GitOpTypeAPIRefsOnly,
 		},
 		{
 			name:        "repo size soft limit only warns",
-			repoSizeErr: limiter.ErrRepoSizeSoftLimitReached,
-			// Archived repos are rejected after the limiter checks, which keeps the
-			// accumulated warning in the returned output.
-			repoState: enum.RepoStateArchived,
-			opType:    enum.GitOpTypeGitPush,
-			expectedOutErr: strPtr(
-				fmt.Sprintf("Push not allowed when repository is in '%s' state", enum.RepoStateArchived),
+			repoSizeErr: repoQuotaErr(limiter.RepoQuotaLevelSoft, 35),
+			repoState:   enum.RepoStateArchived,
+			opType:      enum.GitOpTypeGitPush,
+			// The push is stopped by the archived state, not by the quota.
+			expectedOutErr: archivedRejection(),
+			expectedMessages: []string{
+				"Repository storage",
+				"  [███████████░░░░░░░░░]  58%  35 MiB / 60 MiB  WARNING",
+				"",
+			},
+		},
+		{
+			// A repository over the hard limit on a plan the limit is not enforced for is
+			// over its last threshold, so it reads OVER LIMIT, but it is never blocked.
+			name:           "repo size hard limit only warns when not enforced",
+			repoSizeErr:    repoQuotaErr(limiter.RepoQuotaLevelHard, 62),
+			repoState:      enum.RepoStateArchived,
+			opType:         enum.GitOpTypeGitPush,
+			expectedOutErr: archivedRejection(),
+			expectedMessages: []string{
+				"Repository storage",
+				"  [████████████████████] 100%  62 MiB / 60 MiB  OVER LIMIT",
+				"",
+			},
+		},
+		{
+			// The quota rejection wins over the archived-state one below it, which proves
+			// PreReceive stops as soon as a quota blocks the push.
+			name:           "repo size over limit blocks push",
+			repoSizeErr:    repoQuotaErr(limiter.RepoQuotaLevelOverLimit, 62),
+			repoState:      enum.RepoStateArchived,
+			opType:         enum.GitOpTypeGitPush,
+			expectedOutErr: strPtr("Repository storage limit exceeded; pushes are blocked."),
+			expectedMessages: []string{
+				"Repository storage",
+				"  [████████████████████] 100%  62 MiB / 60 MiB  OVER LIMIT",
+				"",
+			},
+		},
+		{
+			// A blocked push must be reported even for an operation that otherwise returns
+			// an empty output.
+			name:           "repo size over limit blocks refs only operation",
+			repoSizeErr:    repoQuotaErr(limiter.RepoQuotaLevelOverLimit, 62),
+			repoState:      enum.RepoStateActive,
+			opType:         enum.GitOpTypeAPIRefsOnly,
+			expectedOutErr: strPtr("Repository storage limit exceeded; pushes are blocked."),
+			expectedMessages: []string{
+				"Repository storage",
+				"  [████████████████████] 100%  62 MiB / 60 MiB  OVER LIMIT",
+				"",
+			},
+		},
+		{
+			name:                "total storage warn threshold only warns",
+			rootSpaceStorageErr: totalQuotaErr(limiter.TotalQuotaLevelWarn, 41),
+			repoState:           enum.RepoStateArchived,
+			opType:              enum.GitOpTypeGitPush,
+			expectedOutErr:      archivedRejection(),
+			expectedMessages: []string{
+				"Total storage",
+				"  [████████████████░░░░]  82%  41 MiB / 50 MiB  WARNING",
+				"",
+			},
+		},
+		{
+			name:                "total storage critical threshold only warns",
+			rootSpaceStorageErr: totalQuotaErr(limiter.TotalQuotaLevelCritical, 48),
+			repoState:           enum.RepoStateArchived,
+			opType:              enum.GitOpTypeGitPush,
+			expectedOutErr:      archivedRejection(),
+			expectedMessages: []string{
+				"Total storage",
+				"  [███████████████████░]  96%  48 MiB / 50 MiB  CRITICAL",
+				"",
+			},
+		},
+		{
+			name:                "total storage over limit blocks push",
+			rootSpaceStorageErr: totalQuotaErr(limiter.TotalQuotaLevelOverLimit, 62),
+			repoState:           enum.RepoStateActive,
+			opType:              enum.GitOpTypeGitPush,
+			expectedOutErr:      strPtr("Total storage limit exceeded; pushes are blocked."),
+			expectedMessages: []string{
+				"Total storage",
+				"  [████████████████████] 100%  62 MiB / 50 MiB  OVER LIMIT",
+				"",
+			},
+		},
+		{
+			// The limiter wraps nothing today, but a caller in between might, and the
+			// verdict must survive it.
+			name: "wrapped total storage verdict is still recognised",
+			rootSpaceStorageErr: fmt.Errorf(
+				"space %d: %w", testSpaceID, totalQuotaErr(limiter.TotalQuotaLevelOverLimit, 62),
 			),
-			expectedMessages:      []string{limiter.ErrRepoSizeSoftLimitReached.Error(), ""},
-			expectRootStorageCall: true,
+			repoState:      enum.RepoStateActive,
+			opType:         enum.GitOpTypeGitPush,
+			expectedOutErr: strPtr("Total storage limit exceeded; pushes are blocked."),
+			expectedMessages: []string{
+				"Total storage",
+				"  [████████████████████] 100%  62 MiB / 50 MiB  OVER LIMIT",
+				"",
+			},
 		},
 		{
-			name:                  "unexpected repo size error is returned",
-			repoSizeErr:           unexpectedErr,
-			repoState:             enum.RepoStateActive,
-			opType:                enum.GitOpTypeAPIRefsOnly,
-			expectedErr:           "failed to check repository size limit",
-			expectRootStorageCall: false,
+			// Both quotas are reported, so the pusher sees which one to act on. The
+			// total storage rejection is the one shown, because it is checked last.
+			name:                "both quotas are reported",
+			repoSizeErr:         repoQuotaErr(limiter.RepoQuotaLevelOverLimit, 62),
+			rootSpaceStorageErr: totalQuotaErr(limiter.TotalQuotaLevelOverLimit, 62),
+			repoState:           enum.RepoStateActive,
+			opType:              enum.GitOpTypeGitPush,
+			expectedOutErr:      strPtr("Total storage limit exceeded; pushes are blocked."),
+			expectedMessages: []string{
+				"Repository storage",
+				"  [████████████████████] 100%  62 MiB / 60 MiB  OVER LIMIT",
+				"",
+				"Total storage",
+				"  [████████████████████] 100%  62 MiB / 50 MiB  OVER LIMIT",
+				"",
+			},
 		},
 		{
-			name:                  "total storage limit blocks push",
-			rootSpaceStorageErr:   limiter.ErrMaxTotalStorageReached,
-			repoState:             enum.RepoStateActive,
-			opType:                enum.GitOpTypeAPIRefsOnly,
-			expectedOutErr:        strPtr(limiter.ErrMaxTotalStorageReached.Error()),
-			expectRootStorageCall: true,
-		},
-		{
-			name:                  "unexpected total storage error is returned",
-			rootSpaceStorageErr:   unexpectedErr,
-			repoState:             enum.RepoStateActive,
-			opType:                enum.GitOpTypeAPIRefsOnly,
-			expectedErr:           "failed to check total storage limit",
-			expectRootStorageCall: true,
+			// Failing to measure storage must not stop a push: an outage in the metric
+			// store or the license service cannot be allowed to stop every write.
+			name:                "unmeasurable storage fails open",
+			repoSizeErr:         errors.New("repo store down"),
+			rootSpaceStorageErr: errors.New("metrics store down"),
+			repoState:           enum.RepoStateActive,
+			opType:              enum.GitOpTypeAPIRefsOnly,
 		},
 	}
 
@@ -215,29 +330,60 @@ func TestPreReceive_StorageLimits(t *testing.T) {
 				},
 			)
 
-			if tt.expectedErr != "" {
-				require.ErrorContains(t, err, tt.expectedErr)
-				// the original error must stay in the chain for logging/debugging
-				assert.ErrorIs(t, err, unexpectedErr)
-				return
-			}
-
 			require.NoError(t, err)
 			assert.Equal(t, tt.expectedOutErr, out.Error)
 			assert.Equal(t, tt.expectedMessages, out.Messages)
 
+			// Both quotas are always measured: a repository under its own limit can still
+			// sit in a root space that is over the total storage limit.
 			assert.Equal(t, []int64{testRepoID}, l.repoSizeCalls)
-			if tt.expectRootStorageCall {
-				// the total storage quota is enforced against the repo's parent space
-				assert.Equal(t,
-					[]rootSpaceStorageCall{{spaceID: testSpaceID, additionalKiB: 0}},
-					l.rootSpaceStorageCalls,
-				)
-			} else {
-				assert.Empty(t, l.rootSpaceStorageCalls)
-			}
+			// the total storage quota is enforced against the repo's parent space
+			assert.Equal(t,
+				[]rootSpaceStorageCall{{spaceID: testSpaceID, additionalKiB: 0}},
+				l.rootSpaceStorageCalls,
+			)
 		})
 	}
+}
+
+// TestPreReceive_StorageMeasurementFailureIsLogged pins the other half of the fail-open
+// contract that TestPreReceive_StorageLimits's "unmeasurable storage fails open" case
+// doesn't reach: not just that a measurement failure lets the push through, but that it
+// is logged on its way through, since nothing else would record why the quota went
+// unchecked.
+func TestPreReceive_StorageMeasurementFailureIsLogged(t *testing.T) {
+	var buf bytes.Buffer
+	ctx := zerolog.New(&buf).WithContext(context.Background())
+
+	l := &limiterMock{
+		repoSizeErr:         errors.New("repo store down"),
+		rootSpaceStorageErr: errors.New("metrics store down"),
+	}
+
+	repo := newTestRepo()
+	repo.State = enum.RepoStateActive
+
+	out, err := newTestController(repo, l).PreReceive(
+		ctx,
+		nil,
+		nil,
+		types.GithookPreReceiveInput{
+			GithookInputBase: types.GithookInputBase{
+				RepoID:        testRepoID,
+				OperationType: enum.GitOpTypeAPIRefsOnly,
+			},
+		},
+	)
+
+	require.NoError(t, err)
+	assert.Nil(t, out.Error)
+	assert.Nil(t, out.Messages)
+
+	logs := buf.String()
+	assert.Contains(t, logs, "failed to check repository size limit, allowing push")
+	assert.Contains(t, logs, "repo store down")
+	assert.Contains(t, logs, "failed to check total storage limit, allowing push")
+	assert.Contains(t, logs, "metrics store down")
 }
 
 // TestPreReceive_StorageLimitsSkipped documents the operations that must not be
@@ -267,11 +413,11 @@ func TestPreReceive_StorageLimitsSkipped(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// any limiter call would return a blocking error, so an empty output
-			// proves the limiter wasn't consulted
+			// any limiter call would block the push, so an empty output proves the
+			// limiter wasn't consulted
 			l := &limiterMock{
-				repoSizeErr:         limiter.ErrMaxRepoSizeReached,
-				rootSpaceStorageErr: limiter.ErrMaxTotalStorageReached,
+				repoSizeErr:         repoQuotaErr(limiter.RepoQuotaLevelOverLimit, 62),
+				rootSpaceStorageErr: totalQuotaErr(limiter.TotalQuotaLevelOverLimit, 62),
 			}
 
 			repo := newTestRepo()

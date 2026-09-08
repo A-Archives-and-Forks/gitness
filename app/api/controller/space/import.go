@@ -82,6 +82,12 @@ func (c *Controller) Import(ctx context.Context, session *auth.Session, in *Impo
 			return fmt.Errorf("resource limit exceeded: %w", limiter.ErrMaxNumReposReached)
 		}
 
+		// A space that is over an enforced storage limit takes no new repository, and an
+		// import only adds more.
+		if err := limiter.RejectIfStorageOverLimit(ctx, c.resourceLimiter, parentSpace.ID); err != nil {
+			return err
+		}
+
 		space, err = c.createSpaceInnerInTX(ctx, session, parentSpace, &in.CreateInput)
 		if err != nil {
 			return err

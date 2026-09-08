@@ -15,13 +15,17 @@
 package githook
 
 import (
+	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
+	"github.com/harness/gitness/app/api/controller/limiter"
 	"github.com/harness/gitness/git"
 	"github.com/harness/gitness/git/hook"
 
+	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
 )
 
@@ -29,6 +33,10 @@ var (
 	colorScanHeader            = color.New(color.FgHiWhite, color.Underline)
 	colorScanSummary           = color.New(color.FgHiRed, color.Bold)
 	colorScanSummaryNoFindings = color.New(color.FgHiGreen, color.Bold)
+
+	infoColor     = color.New(color.FgCyan)
+	warningColor  = color.New(color.FgYellow)
+	criticalColor = color.New(color.FgRed, color.Bold)
 )
 
 func printScanSecretsFindings(
@@ -182,6 +190,217 @@ func printOversizeFiles(
 
 		cumulativeTotal += total
 	}
+}
+
+// printRepoQuotaLimit renders err as a repository storage bar and reports whether err was
+// a quota verdict at all. Anything else is a failure to measure the repository, which is
+// for the caller to deal with.
+func printRepoQuotaLimit(
+	output *hook.Output,
+	err error,
+) bool {
+	quotaErr, ok := errors.AsType[*limiter.RepoQuotaStorageError](err)
+	if !ok {
+		return false
+	}
+
+	// A repository has no separate critical threshold, so the hard limit doubles as one.
+	appendQuotaMessage(
+		output,
+		"Repository storage",
+		quotaErr.Size,
+		quotaErr.SoftLimit,
+		quotaErr.HardLimit,
+		quotaErr.HardLimit,
+		repoQuotaStatus(quotaErr.Level),
+	)
+
+	// Only a space for which the hard limit is enforced is rejected. The lower levels,
+	// and a crossed hard limit that isn't enforced, are advisory and must not set an error.
+	// The bar above already reports the usage against the limit, so the rejection only
+	// has to name which limit stopped the push.
+	if quotaErr.Level == limiter.RepoQuotaLevelOverLimit {
+		output.Error = new(
+			criticalColor.Sprint("Repository storage limit exceeded; pushes are blocked."),
+		)
+	}
+
+	return true
+}
+
+// printTotalStorageQuotaLimit renders err as a total storage bar and reports whether err
+// was a quota verdict at all, the way printRepoQuotaLimit does.
+func printTotalStorageQuotaLimit(
+	output *hook.Output,
+	err error,
+) bool {
+	quotaErr, ok := errors.AsType[*limiter.TotalQuotaStorageError](err)
+	if !ok {
+		return false
+	}
+
+	// Total storage thresholds are configured as percentages of the limit rather than as
+	// absolute sizes, so they are converted here to the bytes the bar works in.
+	appendQuotaMessage(
+		output,
+		"Total storage",
+		quotaErr.Size,
+		percentOfLimit(quotaErr.Limit, quotaErr.WarnPercent),
+		percentOfLimit(quotaErr.Limit, quotaErr.CriticalPercent),
+		quotaErr.Limit,
+		totalQuotaStatus(quotaErr.Level),
+	)
+
+	if quotaErr.Blocked() {
+		output.Error = new(
+			criticalColor.Sprint("Total storage limit exceeded; pushes are blocked."),
+		)
+	}
+
+	return true
+}
+
+// percentOfLimit converts a percentage threshold into the byte size it stands for.
+// It returns 0 when either side is unset, which appendQuotaMessage reads as "no band".
+func percentOfLimit(limit int64, percent int) int64 {
+	if limit <= 0 || percent <= 0 {
+		return 0
+	}
+	return limit / 100 * int64(percent)
+}
+
+// formatQuotaBytes renders a byte count the way the storage emails and the usage API do,
+// so the same figure reads identically on every surface.
+func formatQuotaBytes(bytes int64) string {
+	if bytes < 0 {
+		bytes = 0
+	}
+	return humanize.IBytes(uint64(bytes)) //nolint:gosec
+}
+
+func quotaProgressBar(
+	size int64,
+	softLimit int64,
+	criticalLimit int64,
+	hardLimit int64,
+) string {
+	if hardLimit <= 0 {
+		return ""
+	}
+
+	const width = 20
+
+	softRatio := float64(softLimit) / float64(hardLimit)
+	criticalRatio := float64(criticalLimit) / float64(hardLimit)
+	usageRatio := float64(size) / float64(hardLimit)
+
+	softWidth := int(softRatio * width)
+	criticalWidth := int(criticalRatio * width)
+	usageWidth := int(usageRatio * width)
+
+	if softWidth > width {
+		softWidth = width
+	}
+	if criticalWidth > width {
+		criticalWidth = width
+	}
+	if usageWidth > width {
+		usageWidth = width
+	}
+
+	// Make sure the boundaries are sane.
+	if criticalWidth < softWidth {
+		criticalWidth = softWidth
+	}
+
+	var bar strings.Builder
+
+	// Used space.
+	for i := 0; i < usageWidth; i++ {
+		switch {
+		case i < softWidth:
+			bar.WriteString(infoColor.Sprint("█"))
+		case i < criticalWidth:
+			bar.WriteString(warningColor.Sprint("█"))
+		default:
+			bar.WriteString(criticalColor.Sprint("█"))
+		}
+	}
+
+	// Remaining space.
+	for i := usageWidth; i < width; i++ {
+		bar.WriteString("░")
+	}
+
+	percentage := min(int(usageRatio*100), 100)
+
+	return fmt.Sprintf(
+		"[%s] %3d%%  %s / %s",
+		bar.String(),
+		percentage,
+		formatQuotaBytes(size),
+		formatQuotaBytes(hardLimit),
+	)
+}
+
+// quotaStatus is the label shown beside a quota bar. It is derived from the level the
+// limiter decided on rather than recomputed from the sizes, because the sizes alone
+// cannot tell a usage past the critical threshold from one past the limit itself.
+type quotaStatus struct {
+	label string
+	color *color.Color
+}
+
+var (
+	quotaStatusOK        = quotaStatus{label: "OK", color: infoColor}
+	quotaStatusWarning   = quotaStatus{label: "WARNING", color: warningColor}
+	quotaStatusCritical  = quotaStatus{label: "CRITICAL", color: criticalColor}
+	quotaStatusOverLimit = quotaStatus{label: "OVER LIMIT", color: criticalColor}
+)
+
+func repoQuotaStatus(level limiter.RepoQuotaStorageLevel) quotaStatus {
+	switch level {
+	case limiter.RepoQuotaLevelSoft:
+		return quotaStatusWarning
+	// A repository has no critical band, so the hard limit is its last tier. Both levels
+	// mean the repository is over it; only the enforced one also rejects the push.
+	case limiter.RepoQuotaLevelHard, limiter.RepoQuotaLevelOverLimit:
+		return quotaStatusOverLimit
+	}
+	return quotaStatusOK
+}
+
+func totalQuotaStatus(level limiter.TotalQuotaStorageLevel) quotaStatus {
+	switch level {
+	case limiter.TotalQuotaLevelWarn:
+		return quotaStatusWarning
+	case limiter.TotalQuotaLevelCritical:
+		return quotaStatusCritical
+	case limiter.TotalQuotaLevelOverLimit:
+		return quotaStatusOverLimit
+	}
+	return quotaStatusOK
+}
+
+func appendQuotaMessage(
+	output *hook.Output,
+	title string,
+	size int64,
+	softLimit int64,
+	criticalLimit int64,
+	hardLimit int64,
+	status quotaStatus,
+) {
+	output.Messages = append(
+		output.Messages,
+		title,
+		fmt.Sprintf(
+			"  %s  %s",
+			quotaProgressBar(size, softLimit, criticalLimit, hardLimit),
+			status.color.Sprint(status.label),
+		),
+		"",
+	)
 }
 
 func printCommitterMismatch(

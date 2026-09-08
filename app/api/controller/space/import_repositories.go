@@ -100,6 +100,12 @@ func (c *Controller) ImportRepositories(
 			return fmt.Errorf("resource limit exceeded: %w", limiter.ErrMaxNumReposReached)
 		}
 
+		// A space that is over an enforced storage limit takes no new repository, and an
+		// import only adds more.
+		if err := limiter.RejectIfStorageOverLimit(ctx, c.resourceLimiter, space.ID); err != nil {
+			return err
+		}
+
 		for _, repo := range repos {
 			repo.RootSpaceID = spaceFull.RootSpaceID
 			repo.RootSpaceIdentifier = spaceFull.RootSpaceIdentifier

@@ -135,6 +135,12 @@ func (c *Controller) restoreSpaceInnerInTx(
 		return nil, fmt.Errorf("resource limit exceeded: %w", limiter.ErrMaxNumReposReached)
 	}
 
+	// A restore brings the repositories' storage back, so a space that is over an
+	// enforced storage limit takes no restore either.
+	if err := limiter.RejectIfStorageOverLimit(ctx, c.resourceLimiter, space.ID); err != nil {
+		return nil, err
+	}
+
 	filter := &types.SpaceFilter{
 		Page:      1,
 		Size:      math.MaxInt,

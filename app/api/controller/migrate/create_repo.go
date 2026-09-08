@@ -106,6 +106,12 @@ func (c *Controller) CreateRepo(
 			return fmt.Errorf("resource limit exceeded: %w", limiter.ErrMaxNumReposReached)
 		}
 
+		// A space that is over an enforced storage limit takes no new repository, and a
+		// migration only adds more.
+		if err := limiter.RejectIfStorageOverLimit(ctx, c.resourceLimiter, parentSpace.ID); err != nil {
+			return err
+		}
+
 		// lock the space for update during repo creation to prevent racing conditions with space soft delete.
 		parentSpace, err = c.spaceStore.FindForUpdate(ctx, parentSpace.ID)
 		if err != nil {

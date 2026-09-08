@@ -86,6 +86,12 @@ func (c *Controller) RestoreNoAuth(
 			return fmt.Errorf("resource limit exceeded: %w", limiter.ErrMaxNumReposReached)
 		}
 
+		// A restore brings the repository's storage back, so a space that is over an
+		// enforced storage limit takes no restore either.
+		if err := limiter.RejectIfStorageOverLimit(ctx, c.resourceLimiter, newParentID); err != nil {
+			return err
+		}
+
 		repo, err = c.repoStore.Restore(ctx, repo, newIdentifier, &newParentID)
 		if err != nil {
 			return fmt.Errorf("failed to restore the repo: %w", err)

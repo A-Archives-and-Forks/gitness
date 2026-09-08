@@ -16,12 +16,10 @@ package githook
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
 	apiauth "github.com/harness/gitness/app/api/auth"
-	"github.com/harness/gitness/app/api/controller/limiter"
 	"github.com/harness/gitness/app/api/usererror"
 	"github.com/harness/gitness/app/auth"
 	"github.com/harness/gitness/app/services/mergequeue"
@@ -33,6 +31,7 @@ import (
 
 	"github.com/gotidy/ptr"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/exp/slices"
 )
 
@@ -81,24 +80,23 @@ func (c *Controller) PreReceive(
 
 	// Storage limits are user facing: a breached hard limit rejects the push with a
 	// readable message rather than an internal error, a breached soft limit only warns.
-	if err := c.limiter.RepoSize(ctx, in.RepoID); err != nil {
-		switch {
-		case errors.Is(err, limiter.ErrRepoSizeSoftLimitReached):
-			output.Messages = append(output.Messages, err.Error(), "")
-		case errors.Is(err, limiter.ErrMaxRepoSizeReached):
-			output.Error = ptr.String(err.Error())
-			return output, nil
-		default:
-			return hook.Output{}, fmt.Errorf("failed to check repository size limit: %w", err)
-		}
+	if err := c.limiter.RepoSize(ctx, in.RepoID); err != nil && !printRepoQuotaLimit(&output, err) {
+		// Failing to measure the repository must not stop a push, but it must not be
+		// silent either: nothing else records why the quota went unchecked.
+		log.Ctx(ctx).Warn().Err(err).Msg("failed to check repository size limit, allowing push")
 	}
 
-	if err := c.limiter.RootSpaceStorage(ctx, repo.ParentID, 0); err != nil {
-		if errors.Is(err, limiter.ErrMaxTotalStorageReached) {
-			output.Error = ptr.String(err.Error())
-			return output, nil
-		}
-		return hook.Output{}, fmt.Errorf("failed to check total storage limit: %w", err)
+	if err := c.limiter.RootSpaceStorage(
+		ctx, repo.ParentID,
+	); err != nil && !printTotalStorageQuotaLimit(&output, err) {
+		log.Ctx(ctx).Warn().Err(err).Msg("failed to check total storage limit, allowing push")
+	}
+
+	// A quota that blocks the push has put the reason in output.Error, and no check below
+	// can overturn it. Returning here also keeps that reason from being dropped by the
+	// api_refs_only exit just below, which returns an empty output.
+	if output.Error != nil {
+		return output, nil
 	}
 
 	// For API ops that only modify references (branch and tags) without pushing commits

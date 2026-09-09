@@ -16,15 +16,47 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/harness/gitness/app/auth"
 	"github.com/harness/gitness/app/bootstrap"
 	"github.com/harness/gitness/app/githook"
 	"github.com/harness/gitness/app/url"
+	"github.com/harness/gitness/errors"
 	"github.com/harness/gitness/git"
+	"github.com/harness/gitness/git/hook"
 	"github.com/harness/gitness/types"
 	"github.com/harness/gitness/types/enum"
+
+	"github.com/rs/zerolog/log"
 )
+
+// RuleViolationsFromError decodes the push-rule violations a githook attached to a
+// blocking error (see hook.RuleViolationsErrorDetailsKey), returning true only if any
+// were present.
+func RuleViolationsFromError(err error) ([]types.RuleViolations, bool) {
+	details := errors.Details(err)
+	if details == nil {
+		return nil, false
+	}
+
+	raw, ok := details[hook.RuleViolationsErrorDetailsKey].(json.RawMessage)
+	if !ok || len(raw) == 0 {
+		return nil, false
+	}
+
+	var violations []types.RuleViolations
+	if err := json.Unmarshal(raw, &violations); err != nil {
+		// The payload was marshaled by the githook from the same type, so a decode
+		// failure means the two ends drifted (a bug), not a user condition. Fail closed
+		// so the caller surfaces the original block error, but log it so the drift isn't
+		// silent.
+		log.Warn().Err(err).Msg("failed to decode rule violations from error details")
+		return nil, false
+	}
+
+	return violations, len(violations) > 0
+}
 
 // CreateRPCGitPushWriteParams creates base write parameters for git push operations from git clients.
 func CreateRPCGitPushWriteParams(

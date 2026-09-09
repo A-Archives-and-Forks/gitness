@@ -449,6 +449,33 @@ func TestPreReceive_StorageLimitsSkipped(t *testing.T) {
 	}
 }
 
+// TestOperationAllowsPushBypass pins the bypass gate per operation type: a security
+// boundary where flipping api_content back to bypassable would silently skip push rules
+// for any actor on the bypass list. Every op type is asserted, not just bypassable ones.
+func TestOperationAllowsPushBypass(t *testing.T) {
+	tests := []struct {
+		opType enum.GitOpType
+		want   bool
+	}{
+		{enum.GitOpTypeGitPush, true},
+		{enum.GitOpTypeAPIContentBypassRules, true},
+		{enum.GitOpTypeAPIContent, false},
+		{enum.GitOpTypeAPIRefsOnly, false},
+		{enum.GitOpTypeAPISystemRefs, false},
+		{enum.GitOpTypeAPILinkedSync, false},
+		{enum.GitOpTypeManageRepo, false},
+		{enum.GitOpTypeMergeQueue, false},
+		{enum.GitOpType(""), false},
+		{enum.GitOpType("unknown_op"), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(string(tt.opType), func(t *testing.T) {
+			assert.Equal(t, tt.want, operationAllowsPushBypass(tt.opType))
+		})
+	}
+}
+
 func strPtr(s string) *string {
 	return &s
 }

@@ -223,6 +223,11 @@ func (c *Controller) CommitFiles(ctx context.Context,
 		AuthorDate:    &now,
 	})
 	if err != nil {
+		// Push rules run in the pre-receive hook (they need the pushed objects); surface
+		// their violations to the API/UI instead of an opaque error.
+		if pushViolations, ok := controller.RuleViolationsFromError(err); ok {
+			return types.CommitFilesResponse{}, append(violations, pushViolations...), nil
+		}
 		return types.CommitFilesResponse{}, nil, err
 	}
 

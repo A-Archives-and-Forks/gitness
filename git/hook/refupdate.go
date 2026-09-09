@@ -200,7 +200,12 @@ func (u *RefUpdater) Pre(ctx context.Context, alternateDirs ...string) error {
 		log.Ctx(ctx).Debug().
 			Str("err", *out.Error).
 			Msgf("Pre-receive blocked ref update\nMessages\n%v", out.Messages)
-		return errors.UnprocessableEntityf("pre-receive hook blocked reference update: %q", *out.Error)
+		blockErr := errors.UnprocessableEntityf("pre-receive hook blocked reference update: %q", *out.Error)
+		// Carry structured violations on the error so the API layer can surface them.
+		if len(out.RuleViolations) > 0 {
+			blockErr = blockErr.SetDetails(map[string]any{RuleViolationsErrorDetailsKey: out.RuleViolations})
+		}
+		return blockErr
 	}
 
 	u.state = stateUpdate

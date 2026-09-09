@@ -16,6 +16,7 @@ package githook
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -202,6 +203,17 @@ func (c *Controller) PreReceive(
 
 	processProtectionViolations(&output, rulesViolations, settingsViolations)
 
+	// Only push violations are propagated: they need the pushed objects, so the API
+	// caller can't compute them itself. It already has the ref-rule and merge-queue
+	// violations, so marshaling the full set would duplicate them in its response.
+	if len(pushRulesViolations) > 0 {
+		raw, err := json.Marshal(pushRulesViolations)
+		if err != nil {
+			return hook.Output{}, fmt.Errorf("failed to marshal push rule violations: %w", err)
+		}
+		output.RuleViolations = raw
+	}
+
 	return output, nil
 }
 
@@ -288,6 +300,15 @@ func (c *Controller) getRepoSettings(
 	return checks, nil
 }
 
+// operationAllowsPushBypass reports whether an operation may bypass push protection.
+// Only operations that signal bypass intent qualify: API commits with bypass_rules=true
+// and direct git pushes. A plain API commit (bypass_rules=false) blocks instead, so the
+// caller can retry with bypass enabled.
+func operationAllowsPushBypass(opType enum.GitOpType) bool {
+	return opType == enum.GitOpTypeAPIContentBypassRules ||
+		opType == enum.GitOpTypeGitPush
+}
+
 // checkPushProtection handles push protection verification for active repositories.
 func (c *Controller) checkPushProtection(
 	ctx context.Context,
@@ -302,12 +323,7 @@ func (c *Controller) checkPushProtection(
 ) ([]types.RuleViolations, *repoSettingsViolations, error) {
 	pushProtection := c.protectionManager.FilterPushProtection(protectionRules)
 
-	// TODO: Once push rule violations are returned to the API layer,
-	// allow bypass only for operations that explicitly support it.
-	// Specifically:
-	//   - GitOpTypeAPIContentBypassRules: API operations that intentionally bypass rules
-	//   - GitOpTypeGitPush: direct git pushes from clients
-	allowBypass := true
+	allowBypass := operationAllowsPushBypass(in.OperationType)
 
 	pushVerifyOut, _, err := pushProtection.PushVerify(
 		ctx,

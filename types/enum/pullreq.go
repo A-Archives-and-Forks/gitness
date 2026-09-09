@@ -117,6 +117,7 @@ const (
 	PullReqActivityTypeLabelModify                     PullReqActivityType = "label-modify"
 	PullReqActivityTypeNonUniqueMergeBase              PullReqActivityType = "non-unique-merge-base"
 	PullReqActivityTypeAutoMergeUnsupportedMergeMethod PullReqActivityType = "auto-merge-unsupported-merge-method"
+	PullReqActivityTypeAutoMergeDisabledBranchUpdate   PullReqActivityType = "auto-merge-disabled-branch-update"
 	PullReqActivityTypeMergeQueueAdd                   PullReqActivityType = "merge-queue-added"
 	PullReqActivityTypeMergeQueueRemove                PullReqActivityType = "merge-queue-removed"
 	PullReqActivityTypeTargetBranchDeleted             PullReqActivityType = "target-branch-deleted"
@@ -140,6 +141,7 @@ var pullReqActivityTypes = sortEnum([]PullReqActivityType{
 	PullReqActivityTypeLabelModify,
 	PullReqActivityTypeNonUniqueMergeBase,
 	PullReqActivityTypeAutoMergeUnsupportedMergeMethod,
+	PullReqActivityTypeAutoMergeDisabledBranchUpdate,
 	PullReqActivityTypeMergeQueueAdd,
 	PullReqActivityTypeMergeQueueRemove,
 	PullReqActivityTypeTargetBranchDeleted,

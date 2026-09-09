@@ -5549,6 +5549,7 @@ paths:
         schema:
           items:
             enum:
+            - auto-merge-disabled-branch-update
             - auto-merge-unsupported-merge-method
             - branch-delete
             - branch-restore
@@ -15098,6 +15099,7 @@ components:
       type: string
     EnumPullReqActivityType:
       enum:
+      - auto-merge-disabled-branch-update
       - auto-merge-unsupported-merge-method
       - branch-delete
       - branch-restore

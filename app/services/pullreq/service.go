@@ -47,6 +47,7 @@ type Service struct {
 	repoStore               store.RepoStore
 	pullreqStore            store.PullReqStore
 	activityStore           store.PullReqActivityStore
+	autoMergeStore          store.AutoMergeStore
 	principalStore          store.PrincipalStore
 	reviewerStore           store.PullReqReviewerStore
 	reviewerSuggestionStore store.PullReqReviewerSuggestionStore
@@ -76,6 +77,7 @@ func New(ctx context.Context,
 	repoStore store.RepoStore,
 	pullreqStore store.PullReqStore,
 	activityStore store.PullReqActivityStore,
+	autoMergeStore store.AutoMergeStore,
 	principalStore store.PrincipalStore,
 	reviewerStore store.PullReqReviewerStore,
 	reviewerSuggestionStore store.PullReqReviewerSuggestionStore,
@@ -96,6 +98,7 @@ func New(ctx context.Context,
 		repoStore:               repoStore,
 		pullreqStore:            pullreqStore,
 		activityStore:           activityStore,
+		autoMergeStore:          autoMergeStore,
 		principalStore:          principalStore,
 		reviewerStore:           reviewerStore,
 		reviewerSuggestionStore: reviewerSuggestionStore,

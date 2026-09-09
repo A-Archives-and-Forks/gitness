@@ -195,6 +195,11 @@ func (s *Service) updatePullReqOnBranchUpdate(ctx context.Context,
 		oldMergeBase := pr.MergeBaseSHA
 		newMergeBase := mergeBaseInfo.MergeBaseSHA
 
+		// Activity sequence numbers are reserved inside the update so that the branch update activity
+		// always precedes the auto-merge-disabled activity in the timeline.
+		var activitySeqBranchUpdate, activitySeqAutoMergeDisabled int64
+		var autoMergeDisabled bool
+
 		// Update the database with the latest source commit SHA and the merge base SHA.
 		pr, err = s.pullreqStore.UpdateOptLock(ctx, pr, func(pr *types.PullReq) error {
 			// to avoid racing conditions with merge
@@ -202,7 +207,22 @@ func (s *Service) updatePullReqOnBranchUpdate(ctx context.Context,
 				return ErrPullReqNotOpen
 			}
 
-			pr.ActivitySeq++
+			// Auto-merge expresses the intent to merge one specific revision once all other conditions pass,
+			// so a new revision has to be re-confirmed. Clearing the substate in the same update that sets the
+			// new source SHA is what makes this race-free: no downstream consumer of the pull request level
+			// BranchUpdated event can observe the new SHA while the PR is still flagged for auto-merge.
+			autoMergeDisabled = pr.SubState == enum.PullReqSubStateAutoMerge
+
+			if autoMergeDisabled {
+				pr.ActivitySeq += 2
+				activitySeqBranchUpdate = pr.ActivitySeq - 1
+				activitySeqAutoMergeDisabled = pr.ActivitySeq
+				pr.SubState = enum.PullReqSubStateNone
+			} else {
+				pr.ActivitySeq++
+				activitySeqBranchUpdate = pr.ActivitySeq
+			}
+
 			if pr.SourceSHA != event.Payload.OldSHA {
 				return fmt.Errorf(
 					"failed to set SourceSHA for PR %d to value '%s', expected SHA '%s' but current pr has '%s'",
@@ -236,10 +256,32 @@ func (s *Service) updatePullReqOnBranchUpdate(ctx context.Context,
 			CommitTitle: commitTitle,
 		}
 
+		pr.ActivitySeq = activitySeqBranchUpdate
 		_, err = s.activityStore.CreateWithPayload(ctx, pr, event.Payload.PrincipalID, payload, nil)
 		if err != nil {
 			// non-critical error
 			log.Ctx(ctx).Err(err).Msgf("failed to write pull request activity after branch update")
+		}
+
+		// The substate flip above is the load-bearing part and is already committed, so the
+		// remaining auto-merge cleanup is best-effort.
+		if autoMergeDisabled {
+			if _, err := s.autoMergeStore.Delete(ctx, pr.ID); err != nil {
+				// non-critical error
+				log.Ctx(ctx).Err(err).Msgf("failed to delete auto merge entry for PR %d after branch update",
+					pr.Number)
+			}
+
+			pr.ActivitySeq = activitySeqAutoMergeDisabled
+			if _, err := s.activityStore.CreateWithPayload(ctx, pr, event.Payload.PrincipalID,
+				&types.PullRequestActivityPayloadAutoMergeDisabledBranchUpdate{
+					Old: event.Payload.OldSHA,
+					New: event.Payload.NewSHA,
+				}, nil,
+			); err != nil {
+				// non-critical error
+				log.Ctx(ctx).Err(err).Msg("failed to write auto-merge-disabled activity after branch update")
+			}
 		}
 
 		s.pullreqEvReporter.BranchUpdated(ctx, &pullreqevents.BranchUpdatedPayload{

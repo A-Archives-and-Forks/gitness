@@ -72,6 +72,7 @@ var allPullReqActivityPayloads = func(
 	func() PullReqActivityPayload { return &PullRequestActivityLabels{} },
 	func() PullReqActivityPayload { return &PullRequestActivityPayloadNonUniqueMergeBase{} },
 	func() PullReqActivityPayload { return &PullRequestActivityPayloadAutoMergeDisabled{} },
+	func() PullReqActivityPayload { return &PullRequestActivityPayloadAutoMergeDisabledBranchUpdate{} },
 	func() PullReqActivityPayload { return &PullRequestActivityPayloadMergeQueueAdd{} },
 	func() PullReqActivityPayload { return &PullRequestActivityPayloadMergeQueueRemove{} },
 })
@@ -273,6 +274,17 @@ type PullRequestActivityPayloadAutoMergeDisabled struct {
 
 func (a *PullRequestActivityPayloadAutoMergeDisabled) ActivityType() enum.PullReqActivityType {
 	return enum.PullReqActivityTypeAutoMergeUnsupportedMergeMethod
+}
+
+// PullRequestActivityPayloadAutoMergeDisabledBranchUpdate records the push that turned auto-merge off,
+// so the timeline can point at the exact revision change that invalidated the auto-merge intent.
+type PullRequestActivityPayloadAutoMergeDisabledBranchUpdate struct {
+	Old string `json:"old"`
+	New string `json:"new"`
+}
+
+func (a *PullRequestActivityPayloadAutoMergeDisabledBranchUpdate) ActivityType() enum.PullReqActivityType {
+	return enum.PullReqActivityTypeAutoMergeDisabledBranchUpdate
 }
 
 type PullRequestActivityPayloadMergeQueueAdd struct {

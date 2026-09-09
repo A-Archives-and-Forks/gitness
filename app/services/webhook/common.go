@@ -22,6 +22,7 @@ import (
 
 	"github.com/harness/gitness/audit"
 	"github.com/harness/gitness/errors"
+	"github.com/harness/gitness/netpolicy"
 	"github.com/harness/gitness/types"
 	"github.com/harness/gitness/types/check"
 	"github.com/harness/gitness/types/enum"
@@ -77,23 +78,25 @@ func CheckURL(
 	}
 
 	if ip := net.ParseIP(host); ip != nil {
-		switch {
-		case ip.IsLoopback():
+		switch netpolicy.Classify(ip) {
+		case netpolicy.ClassLoopback:
 			if !allowLoopback {
 				return check.NewValidationError("Loopback IP addresses are not allowed.")
 			}
-		case ip.IsLinkLocalUnicast(), ip.IsLinkLocalMulticast():
+		case netpolicy.ClassLinkLocal:
 			if !allowLinkLocal {
 				return check.NewValidationError("Link-local IP addresses are not allowed.")
 			}
-		case ip.IsPrivate():
+		case netpolicy.ClassPrivate:
 			if !allowPrivateNetwork {
 				return check.NewValidationError("Private IP addresses are not allowed.")
 			}
-		case ip.IsGlobalUnicast():
+		case netpolicy.ClassPublic:
 			// allowed
+		case netpolicy.ClassReserved:
+			// unspecified (0.0.0.0/::), broadcast, multicast, reserved ranges
+			return check.NewValidationError("IP address is not allowed.")
 		default:
-			// unspecified (0.0.0.0/::), broadcast, other multicast ranges
 			return check.NewValidationError("IP address is not allowed.")
 		}
 	}

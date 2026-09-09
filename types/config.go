@@ -354,6 +354,16 @@ type Config struct {
 		InternalSecret string        `envconfig:"GITNESS_WEBHOOK_INTERNAL_SECRET"`
 	}
 
+	Importer struct {
+		// AllowPrivateNetwork, AllowLoopback and AllowLinkLocal control which
+		// resolved addresses repository import is allowed to reach, both for the
+		// provider API calls and for the git clone of the imported repository.
+		// The provider host is user provided, so all of them default to false.
+		AllowPrivateNetwork bool `envconfig:"GITNESS_IMPORTER_ALLOW_PRIVATE_NETWORK" default:"false"`
+		AllowLoopback       bool `envconfig:"GITNESS_IMPORTER_ALLOW_LOOPBACK" default:"false"`
+		AllowLinkLocal      bool `envconfig:"GITNESS_IMPORTER_ALLOW_LINK_LOCAL" default:"false"`
+	}
+
 	Trigger struct {
 		Concurrency int `envconfig:"GITNESS_TRIGGER_CONCURRENCY" default:"4"`
 		MaxRetries  int `envconfig:"GITNESS_TRIGGER_MAX_RETRIES" default:"3"`

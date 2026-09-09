@@ -17,6 +17,7 @@ package importer
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 	"path"
 	"strings"
@@ -37,6 +38,7 @@ import (
 	"github.com/harness/gitness/errors"
 	"github.com/harness/gitness/git"
 	"github.com/harness/gitness/git/sha"
+	"github.com/harness/gitness/netpolicy"
 	"github.com/harness/gitness/store/database/dbtx"
 	"github.com/harness/gitness/types"
 	"github.com/harness/gitness/types/enum"
@@ -64,6 +66,14 @@ type Importer struct {
 	eventReporter *repoevents.Reporter
 	auditService  audit.Service
 	settings      *settings.Service
+
+	// networkPolicy restricts which addresses an import is allowed to reach.
+	// The provider host of an import is user provided, so its zero value - which
+	// allows public addresses only - is the safe default.
+	networkPolicy netpolicy.Policy
+	// baseTransport is the RoundTripper underneath every provider API call. It
+	// enforces networkPolicy on the resolved address of each connection.
+	baseTransport http.RoundTripper
 }
 
 func NewImporter(
@@ -81,6 +91,7 @@ func NewImporter(
 	eventReporter *repoevents.Reporter,
 	auditService audit.Service,
 	settings *settings.Service,
+	networkPolicy netpolicy.Policy,
 ) *Importer {
 	return &Importer{
 		defaultBranch: defaultBranch,
@@ -97,6 +108,8 @@ func NewImporter(
 		eventReporter: eventReporter,
 		auditService:  auditService,
 		settings:      settings,
+		networkPolicy: networkPolicy,
+		baseTransport: newBaseTransport(networkPolicy),
 	}
 }
 
@@ -131,6 +144,20 @@ func (r *Importer) Import(ctx context.Context, input Input) error {
 	repoURL, err := url.Parse(input.CloneURL)
 	if err != nil {
 		return fmt.Errorf("failed to parse git clone URL: %w", err)
+	}
+
+	// The clone URL is taken from the response of the import provider, which is
+	// reached at a user provided host - so it is untrusted and has to be checked
+	// against the same network policy as the provider API calls. The clone is
+	// performed by git, where the dialer can't be hooked, hence the pre-flight
+	// resolution here. It also restricts the clone to http and https, the only
+	// schemes for which the credentials below are meaningful.
+	if err := r.networkPolicy.CheckURLHost(ctx, nil, input.CloneURL); err != nil {
+		log.Ctx(ctx).Warn().Err(err).
+			Str("clone_url", input.CloneURL).
+			Msg("import provider returned a clone URL that is not allowed")
+
+		return errors.InvalidArgument("The repository clone URL of the provider is not allowed.")
 	}
 
 	repoURL.User = url.UserPassword(input.GitUser, input.GitPass)

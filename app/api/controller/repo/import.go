@@ -60,7 +60,7 @@ func (c *Controller) Import(ctx context.Context, session *auth.Session, in *Impo
 		return nil, err
 	}
 
-	remoteRepository, provider, err := importer.LoadRepositoryFromProvider(ctx, in.Provider, in.ProviderRepo)
+	remoteRepository, provider, err := c.importer.LoadRepositoryFromProvider(ctx, in.Provider, in.ProviderRepo)
 	if err != nil {
 		return nil, err
 	}

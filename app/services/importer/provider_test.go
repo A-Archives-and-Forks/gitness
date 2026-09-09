@@ -157,10 +157,7 @@ func TestMatchesNamespace(t *testing.T) {
 }
 
 func TestLoadRepositoriesFromProviderSpace_GitLab(t *testing.T) {
-	// Override baseTransport to allow loopback for testing
-	originalTransport := baseTransport
-	baseTransport = http.DefaultTransport
-	defer func() { baseTransport = originalTransport }()
+	imp := newLoopbackImporter()
 
 	// Mock GitLab API response for group projects endpoint
 	gitlabRepos := []map[string]any{
@@ -227,7 +224,7 @@ func TestLoadRepositoriesFromProviderSpace_GitLab(t *testing.T) {
 		Password: "testtoken",
 	}
 
-	repos, _, err := LoadRepositoriesFromProviderSpace(context.Background(), provider, "mygroup", true)
+	repos, _, err := imp.LoadRepositoriesFromProviderSpace(context.Background(), provider, "mygroup", true)
 	if err != nil {
 		t.Fatalf("LoadRepositoriesFromProviderSpace failed: %v", err)
 	}
@@ -254,9 +251,7 @@ func TestLoadRepositoriesFromProviderSpace_GitLab(t *testing.T) {
 }
 
 func TestLoadRepositoryFromProvider_Harness(t *testing.T) {
-	originalTransport := baseTransport
-	baseTransport = http.DefaultTransport
-	defer func() { baseTransport = originalTransport }()
+	imp := newLoopbackImporter()
 
 	type harnessRepository struct {
 		UID           string `json:"uid"`
@@ -295,7 +290,7 @@ func TestLoadRepositoryFromProvider_Harness(t *testing.T) {
 		Password: "testkey",
 	}
 
-	repoInfo, _, err := LoadRepositoryFromProvider(context.Background(), provider, "account/org/project/sample-repo")
+	repoInfo, _, err := imp.LoadRepositoryFromProvider(context.Background(), provider, "account/org/project/sample-repo")
 	if err != nil {
 		t.Fatalf("LoadRepositoryFromProvider failed: %v", err)
 	}
@@ -316,9 +311,7 @@ func TestLoadRepositoryFromProvider_Harness(t *testing.T) {
 }
 
 func TestLoadRepositoryFromProvider_Harness_AccountOnlyScope(t *testing.T) {
-	originalTransport := baseTransport
-	baseTransport = http.DefaultTransport
-	defer func() { baseTransport = originalTransport }()
+	imp := newLoopbackImporter()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
@@ -338,15 +331,13 @@ func TestLoadRepositoryFromProvider_Harness_AccountOnlyScope(t *testing.T) {
 		Host: server.URL,
 	}
 
-	if _, _, err := LoadRepositoryFromProvider(context.Background(), provider, "account/sample-repo"); err != nil {
+	if _, _, err := imp.LoadRepositoryFromProvider(context.Background(), provider, "account/sample-repo"); err != nil {
 		t.Fatalf("LoadRepositoryFromProvider failed: %v", err)
 	}
 }
 
 func TestLoadRepositoryFromProvider_Harness_NotFound(t *testing.T) {
-	originalTransport := baseTransport
-	baseTransport = http.DefaultTransport
-	defer func() { baseTransport = originalTransport }()
+	imp := newLoopbackImporter()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
@@ -359,29 +350,33 @@ func TestLoadRepositoryFromProvider_Harness_NotFound(t *testing.T) {
 		Host: server.URL,
 	}
 
-	_, _, err := LoadRepositoryFromProvider(context.Background(), provider, "account/org/project/missing-repo")
+	_, _, err := imp.LoadRepositoryFromProvider(context.Background(), provider, "account/org/project/missing-repo")
 	if err == nil {
 		t.Fatal("Expected error for 404 response, got nil")
 	}
 }
 
 func TestLoadRepositoryFromProvider_Harness_MissingHost(t *testing.T) {
+	imp := newLoopbackImporter()
+
 	provider := Provider{
 		Type: ProviderTypeHarness,
 	}
 
-	if _, _, err := LoadRepositoryFromProvider(context.Background(), provider, "account/sample-repo"); err == nil {
+	if _, _, err := imp.LoadRepositoryFromProvider(context.Background(), provider, "account/sample-repo"); err == nil {
 		t.Fatal("Expected error when provider host is missing, got nil")
 	}
 }
 
 func TestLoadRepositoryFromProvider_Harness_InvalidSlug(t *testing.T) {
+	imp := newLoopbackImporter()
+
 	provider := Provider{
 		Type: ProviderTypeHarness,
 		Host: "https://harness-code.example.com",
 	}
 
-	if _, _, err := LoadRepositoryFromProvider(context.Background(), provider, "sample-repo"); err == nil {
+	if _, _, err := imp.LoadRepositoryFromProvider(context.Background(), provider, "sample-repo"); err == nil {
 		t.Fatal("Expected error for slug missing account scope, got nil")
 	}
 }

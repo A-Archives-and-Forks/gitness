@@ -30,6 +30,7 @@ import (
 	"github.com/harness/gitness/encrypt"
 	"github.com/harness/gitness/git"
 	"github.com/harness/gitness/job"
+	"github.com/harness/gitness/netpolicy"
 	"github.com/harness/gitness/store/database/dbtx"
 	"github.com/harness/gitness/types"
 
@@ -82,6 +83,13 @@ func ProvideImporter(
 		eventReporter,
 		auditService,
 		settings,
+		// the provider host of an import is user provided, so restrict which
+		// addresses an import is allowed to reach.
+		netpolicy.Policy{
+			AllowLoopback:       config.Importer.AllowLoopback,
+			AllowPrivateNetwork: config.Importer.AllowPrivateNetwork,
+			AllowLinkLocal:      config.Importer.AllowLinkLocal,
+		},
 	)
 }
 

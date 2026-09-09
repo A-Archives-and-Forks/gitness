@@ -164,11 +164,12 @@ func TestCheckURL_LinkLocal(t *testing.T) {
 			desc:    "link-local multicast (mDNS 224.0.0.251) must be blocked",
 		},
 		{
-			name:           "link_local_multicast_allowed_when_flag_set",
+			name:           "link_local_multicast_blocked_even_when_flag_set",
 			url:            "http://224.0.0.251/",
 			allowLinkLocal: true,
-			wantErr:        false,
-			desc:           "link-local multicast allowed when allowLinkLocal=true",
+			wantErr:        true,
+			desc: "link-local multicast is not a unicast destination and stays blocked " +
+				"when allowLinkLocal=true",
 		},
 		// --- catch-all: non-globally-unicast addresses ---
 		{

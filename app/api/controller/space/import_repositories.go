@@ -25,7 +25,6 @@ import (
 	"github.com/harness/gitness/app/api/usererror"
 	"github.com/harness/gitness/app/auth"
 	"github.com/harness/gitness/app/paths"
-	"github.com/harness/gitness/app/services/importer"
 	"github.com/harness/gitness/app/services/instrument"
 	"github.com/harness/gitness/audit"
 	"github.com/harness/gitness/store"
@@ -57,7 +56,7 @@ func (c *Controller) ImportRepositories(
 	}
 
 	remoteRepositories, provider, err :=
-		importer.LoadRepositoriesFromProviderSpace(ctx, in.Provider, in.ProviderSpace, in.IncludeSubgroupsRepos)
+		c.importer.LoadRepositoriesFromProviderSpace(ctx, in.Provider, in.ProviderSpace, in.IncludeSubgroupsRepos)
 	if err != nil {
 		return ImportRepositoriesOutput{}, err
 	}

@@ -37,6 +37,7 @@ import (
 	"github.com/drone/go-scm/scm/driver/stash"
 	"github.com/drone/go-scm/scm/transport"
 	"github.com/drone/go-scm/scm/transport/oauth2"
+	"github.com/rs/zerolog/log"
 )
 
 type ProviderType string
@@ -104,45 +105,45 @@ func hash(s string) string {
 	return base32.StdEncoding.EncodeToString(h.Sum(nil)[:10])
 }
 
-func oauthTransport(token string, scheme string) http.RoundTripper {
+func oauthTransport(base http.RoundTripper, token string, scheme string) http.RoundTripper {
 	if token == "" {
-		return baseTransport
+		return base
 	}
 	return &oauth2.Transport{
-		Base:   baseTransport,
+		Base:   base,
 		Scheme: scheme,
 		Source: oauth2.StaticTokenSource(&scm.Token{Token: token}),
 	}
 }
 
-func authHeaderTransport(token string) http.RoundTripper {
+func authHeaderTransport(base http.RoundTripper, token string) http.RoundTripper {
 	if token == "" {
-		return baseTransport
+		return base
 	}
 	return &transport.Authorization{
-		Base:        baseTransport,
+		Base:        base,
 		Scheme:      "token",
 		Credentials: token,
 	}
 }
 
-func basicAuthTransport(username, password string) http.RoundTripper {
+func basicAuthTransport(base http.RoundTripper, username, password string) http.RoundTripper {
 	if username == "" && password == "" {
-		return baseTransport
+		return base
 	}
 	return &transport.BasicAuth{
-		Base:     baseTransport,
+		Base:     base,
 		Username: username,
 		Password: password,
 	}
 }
 
-func apiKeyTransport(apiKey string) http.RoundTripper {
+func apiKeyTransport(base http.RoundTripper, apiKey string) http.RoundTripper {
 	if apiKey == "" {
-		return baseTransport
+		return base
 	}
 	return &transport.Custom{
-		Base: baseTransport,
+		Base: base,
 		Before: func(r *http.Request) {
 			r.Header.Set("x-api-key", apiKey)
 		},
@@ -153,9 +154,21 @@ func apiKeyTransport(apiKey string) http.RoundTripper {
 // layer depending on the provider. For example, for bitbucket we support app passwords
 // so the auth transport is BasicAuth whereas it's Oauth for other providers.
 // It validates that auth credentials are provided if authReq is true.
-func getScmClientWithTransport(provider Provider, slug string, authReq bool) (*scm.Client, error) { //nolint:gocognit
+//
+//nolint:gocognit
+func (r *Importer) getScmClientWithTransport(
+	provider Provider,
+	slug string,
+	authReq bool,
+) (*scm.Client, error) {
 	if authReq && (provider.Username == "" || provider.Password == "") {
 		return nil, usererror.BadRequest("SCM provider authentication credentials missing")
+	}
+	// an empty host means the public endpoint of the provider is used.
+	if provider.Host != "" {
+		if err := r.validateProviderHost(provider.Host); err != nil {
+			return nil, err
+		}
 	}
 	var c *scm.Client
 	var err error
@@ -173,7 +186,7 @@ func getScmClientWithTransport(provider Provider, slug string, authReq bool) (*s
 		} else {
 			c = github.NewDefault()
 		}
-		transport = oauthTransport(provider.Password, oauth2.SchemeBearer)
+		transport = oauthTransport(r.baseTransport, provider.Password, oauth2.SchemeBearer)
 
 	case ProviderTypeGitLab:
 		if provider.Host != "" {
@@ -184,7 +197,7 @@ func getScmClientWithTransport(provider Provider, slug string, authReq bool) (*s
 		} else {
 			c = gitlab.NewDefault()
 		}
-		transport = oauthTransport(provider.Password, oauth2.SchemeBearer)
+		transport = oauthTransport(r.baseTransport, provider.Password, oauth2.SchemeBearer)
 
 	case ProviderTypeBitbucket:
 		if provider.Host != "" {
@@ -195,7 +208,7 @@ func getScmClientWithTransport(provider Provider, slug string, authReq bool) (*s
 		} else {
 			c = bitbucket.NewDefault()
 		}
-		transport = basicAuthTransport(provider.Username, provider.Password)
+		transport = basicAuthTransport(r.baseTransport, provider.Username, provider.Password)
 
 	case ProviderTypeStash:
 		if provider.Host != "" {
@@ -206,7 +219,7 @@ func getScmClientWithTransport(provider Provider, slug string, authReq bool) (*s
 		} else {
 			c = stash.NewDefault()
 		}
-		transport = oauthTransport(provider.Password, oauth2.SchemeBearer)
+		transport = oauthTransport(r.baseTransport, provider.Password, oauth2.SchemeBearer)
 
 	case ProviderTypeGitea:
 		if provider.Host == "" {
@@ -216,7 +229,7 @@ func getScmClientWithTransport(provider Provider, slug string, authReq bool) (*s
 		if err != nil {
 			return nil, fmt.Errorf("scm provider Host invalid: %w", err)
 		}
-		transport = authHeaderTransport(provider.Password)
+		transport = authHeaderTransport(r.baseTransport, provider.Password)
 
 	case ProviderTypeGogs:
 		if provider.Host == "" {
@@ -226,7 +239,7 @@ func getScmClientWithTransport(provider Provider, slug string, authReq bool) (*s
 		if err != nil {
 			return nil, fmt.Errorf("scm provider Host invalid: %w", err)
 		}
-		transport = oauthTransport(provider.Password, oauth2.SchemeToken)
+		transport = oauthTransport(r.baseTransport, provider.Password, oauth2.SchemeToken)
 
 	case ProviderTypeAzure:
 		org, project, err := extractOrgAndProjectFromSlug(slug)
@@ -241,7 +254,7 @@ func getScmClientWithTransport(provider Provider, slug string, authReq bool) (*s
 		} else {
 			c = azure.NewDefault(org, project)
 		}
-		transport = basicAuthTransport(provider.Username, provider.Password)
+		transport = basicAuthTransport(r.baseTransport, provider.Username, provider.Password)
 
 	case ProviderTypeHarness:
 		if provider.Host == "" {
@@ -255,7 +268,7 @@ func getScmClientWithTransport(provider Provider, slug string, authReq bool) (*s
 		if err != nil {
 			return nil, fmt.Errorf("scm provider Host invalid: %w", err)
 		}
-		transport = apiKeyTransport(provider.Password)
+		transport = apiKeyTransport(r.baseTransport, provider.Password)
 
 	default:
 		return nil, fmt.Errorf("unsupported scm provider: %s", provider)
@@ -271,25 +284,25 @@ func getScmClientWithTransport(provider Provider, slug string, authReq bool) (*s
 	return c, nil
 }
 
-func LoadRepositoryFromProvider(
+func (r *Importer) LoadRepositoryFromProvider(
 	ctx context.Context,
 	provider Provider,
 	repoSlug string,
 ) (RepositoryInfo, Provider, error) {
-	if repoSlug == "" {
-		return RepositoryInfo{}, provider, usererror.BadRequest("Provider repository identifier is missing")
+	if err := validateProviderRepoSlug(provider.Type, repoSlug); err != nil {
+		return RepositoryInfo{}, provider, err
 	}
 
-	scmClient, err := getScmClientWithTransport(provider, repoSlug, false)
+	scmClient, err := r.getScmClientWithTransport(provider, repoSlug, false)
 	if err != nil {
 		return RepositoryInfo{}, provider, usererror.BadRequestf("Could not create client: %s", err)
 	}
 
 	// Augment user information if it's not provided for certain vendors.
 	if provider.Password != "" && provider.Username == "" && provider.Type != ProviderTypeHarness {
-		user, _, err := scmClient.Users.Find(ctx)
-		if err != nil {
-			return RepositoryInfo{}, provider, usererror.BadRequestf("Could not find user: %s", err)
+		user, scmResp, err := scmClient.Users.Find(ctx)
+		if err = convertSCMError(ctx, provider, "user", scmResp, err); err != nil {
+			return RepositoryInfo{}, provider, err
 		}
 		provider.Username = user.Login
 	}
@@ -308,7 +321,7 @@ func LoadRepositoryFromProvider(
 		}
 	}
 	scmRepo, scmResp, err := scmClient.Repositories.Find(ctx, repoSlug)
-	if err = convertSCMError(provider, repoSlug, scmResp, err); err != nil {
+	if err = convertSCMError(ctx, provider, repoSlug, scmResp, err); err != nil {
 		return RepositoryInfo{}, provider, err
 	}
 
@@ -322,18 +335,18 @@ func LoadRepositoryFromProvider(
 }
 
 //nolint:gocognit
-func LoadRepositoriesFromProviderSpace(
+func (r *Importer) LoadRepositoriesFromProviderSpace(
 	ctx context.Context,
 	provider Provider,
 	spaceSlug string,
 	includeSubgroupsRepos bool,
 ) ([]RepositoryInfo, Provider, error) {
-	if spaceSlug == "" {
-		return nil, provider, usererror.BadRequest("Provider space identifier is missing")
+	if err := validateProviderSpaceSlug(provider.Type, spaceSlug); err != nil {
+		return nil, provider, err
 	}
 
 	var err error
-	scmClient, err := getScmClientWithTransport(provider, spaceSlug, false)
+	scmClient, err := r.getScmClientWithTransport(provider, spaceSlug, false)
 	if err != nil {
 		return nil, provider, usererror.BadRequestf("Could not create client: %s", err)
 	}
@@ -344,9 +357,9 @@ func LoadRepositoriesFromProviderSpace(
 
 	// Augment user information if it's not provided for certain vendors.
 	if provider.Password != "" && provider.Username == "" {
-		user, _, err := scmClient.Users.Find(ctx)
-		if err != nil {
-			return nil, provider, usererror.BadRequestf("Could not find user: %s", err)
+		user, scmResp, err := scmClient.Users.Find(ctx)
+		if err = convertSCMError(ctx, provider, "user", scmResp, err); err != nil {
+			return nil, provider, err
 		}
 		provider.Username = user.Login
 	}
@@ -379,14 +392,14 @@ func LoadRepositoriesFromProviderSpace(
 	for {
 		if listv2 {
 			scmRepos, scmResp, err = scmClient.Repositories.ListV2(ctx, optsv2)
-			if err = convertSCMError(provider, spaceSlug, scmResp, err); err != nil {
+			if err = convertSCMError(ctx, provider, spaceSlug, scmResp, err); err != nil {
 				return nil, provider, err
 			}
 			optsv2.Page = scmResp.Page.Next
 			optsv2.URL = scmResp.Page.NextURL
 		} else {
 			scmRepos, scmResp, err = scmClient.Repositories.List(ctx, opts)
-			if err = convertSCMError(provider, spaceSlug, scmResp, err); err != nil {
+			if err = convertSCMError(ctx, provider, spaceSlug, scmResp, err); err != nil {
 				return nil, provider, err
 			}
 			opts.Page = scmResp.Page.Next
@@ -478,36 +491,49 @@ func matchesNamespace(providerType ProviderType, repoNamespace, spaceSlug string
 	return strings.EqualFold(repoNamespace, spaceSlug)
 }
 
-func convertSCMError(provider Provider, slug string, r *scm.Response, err error) error {
+// convertSCMError translates a failed provider call into a user facing error.
+//
+// IMPORTANT: the provider host is user provided, so the details of a failure
+// must not be described to the caller. Neither the transport error (which names
+// the resolved address and the syscall) nor the upstream status code may be
+// exposed: both let a caller tell an open internal port apart from a closed one
+// and use repository import as a network scanner. The details are logged
+// instead.
+func convertSCMError(ctx context.Context, provider Provider, slug string, r *scm.Response, err error) error {
 	if err == nil {
 		return nil
 	}
 
-	if r == nil {
-		if provider.Host != "" {
-			return usererror.BadRequestf("Failed to make HTTP request to %s (host=%s): %s",
-				provider.Type, provider.Host, err)
-		}
+	logger := log.Ctx(ctx).Warn().Err(err).
+		Str("provider_type", string(provider.Type)).
+		Str("provider_host", provider.Host)
 
-		return usererror.BadRequestf("Failed to make HTTP request to %s: %s",
-			provider.Type, err)
+	if r == nil {
+		logger.Msg("failed to make http request to import provider")
+
+		return usererror.BadRequestf(
+			"Failed to make an HTTP request to %s. Verify that the provider host is correct and reachable.",
+			provider.Type)
 	}
+
+	logger = logger.Int("provider_status", r.Status)
 
 	switch r.Status {
 	case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther,
 		http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
-		return usererror.BadRequestf("Redirects are not supported (HTTP status %d)", r.Status)
+		logger.Msg("import provider responded with a redirect")
+		return usererror.BadRequest("Redirects are not supported.")
 	case http.StatusNotFound:
-		return usererror.BadRequestf("Couldn't find %s at %s: %s",
-			slug, provider.Type, err.Error())
+		logger.Msg("import provider could not find the requested resource")
+		return usererror.BadRequestf("Couldn't find %s at %s.", slug, provider.Type)
 	case http.StatusUnauthorized:
-		return usererror.BadRequestf("Bad credentials provided for %s at %s: %s",
-			slug, provider.Type, err.Error())
+		logger.Msg("import provider rejected the provided credentials")
+		return usererror.BadRequestf("Bad credentials provided for %s at %s.", slug, provider.Type)
 	case http.StatusForbidden:
-		return usererror.BadRequestf("Access denied to %s at %s: %s",
-			slug, provider.Type, err.Error())
+		logger.Msg("import provider denied access to the requested resource")
+		return usererror.BadRequestf("Access denied to %s at %s.", slug, provider.Type)
 	default:
-		return usererror.BadRequestf("Failed to fetch %s from %s (HTTP status %d): %s",
-			slug, provider.Type, r.Status, err.Error())
+		logger.Msg("failed to fetch resource from import provider")
+		return usererror.BadRequestf("Failed to fetch %s from %s.", slug, provider.Type)
 	}
 }

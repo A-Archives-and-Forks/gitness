@@ -61,7 +61,7 @@ func (c *Controller) Import(ctx context.Context, session *auth.Session, in *Impo
 	}
 
 	remoteRepositories, provider, err :=
-		importer.LoadRepositoriesFromProviderSpace(ctx, in.Provider, in.ProviderSpace, in.IncludeSubgroupsRepos)
+		c.importer.LoadRepositoriesFromProviderSpace(ctx, in.Provider, in.ProviderSpace, in.IncludeSubgroupsRepos)
 	if err != nil {
 		return nil, err
 	}

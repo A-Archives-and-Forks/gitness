@@ -59,6 +59,25 @@ func (r *JobRepository) Register(executor *job.Executor) error {
 	return executor.Register(jobTypeRepositoryImport, r)
 }
 
+// LoadRepositoryFromProvider looks up a single repository at the provided import provider.
+func (r *JobRepository) LoadRepositoryFromProvider(
+	ctx context.Context,
+	provider Provider,
+	repoSlug string,
+) (RepositoryInfo, Provider, error) {
+	return r.importer.LoadRepositoryFromProvider(ctx, provider, repoSlug)
+}
+
+// LoadRepositoriesFromProviderSpace lists the repositories of a space at the provided import provider.
+func (r *JobRepository) LoadRepositoriesFromProviderSpace(
+	ctx context.Context,
+	provider Provider,
+	spaceSlug string,
+	includeSubgroupsRepos bool,
+) ([]RepositoryInfo, Provider, error) {
+	return r.importer.LoadRepositoriesFromProviderSpace(ctx, provider, spaceSlug, includeSubgroupsRepos)
+}
+
 // Run starts a background job that imports the provided repository from the provided clone URL.
 func (r *JobRepository) Run(
 	ctx context.Context,

@@ -920,6 +920,10 @@ export interface StringsMap {
   'protectionRules.enableDefaultReviewersText': string
   'protectionRules.enableDefaultReviewersTitle': string
   'protectionRules.enableTheRule': string
+  'protectionRules.fileSizePlaceholder': string
+  'protectionRules.fileSizeRequired': string
+  'protectionRules.limitFileSize': string
+  'protectionRules.limitFileSizeText': string
   'protectionRules.limitMergeStrategies': string
   'protectionRules.limitMergeStrategiesText': string
   'protectionRules.mergeCheckboxAlert': string
@@ -931,6 +935,8 @@ export interface StringsMap {
   'protectionRules.newRule': string
   'protectionRules.numberOfRulesApplied': string
   'protectionRules.prFailedText': string
+  'protectionRules.principalCommitterMatch': string
+  'protectionRules.principalCommitterMatchText': string
   'protectionRules.protectionSelectAll': string
   'protectionRules.repoSelectionHint': string
   'protectionRules.reqCommentResolutionText': string
@@ -954,6 +960,8 @@ export interface StringsMap {
   'protectionRules.ruleEmpty': string
   'protectionRules.ruleUpdated': string
   'protectionRules.saveRule': string
+  'protectionRules.secretScanningEnabled': string
+  'protectionRules.secretScanningEnabledText': string
   'protectionRules.showRulesScope': string
   'protectionRules.statusCheck': string
   'protectionRules.targetPatternHint': string
@@ -967,6 +975,7 @@ export interface StringsMap {
   pullRequestNotFoundforFilter: string
   pullRequestalreadyExists: string
   pullRequests: string
+  push: string
   pushBlockedMessage: string
   quote: string
   reTriggeredExecution: string

@@ -65,7 +65,8 @@ const ProtectionRulesHeader = ({
   const ruleTypeFilters = [
     { label: getString('all'), value: DashboardFilter.ALL },
     { label: getString('branch'), value: ProtectionRulesType.BRANCH },
-    { label: getString('tag'), value: ProtectionRulesType.TAG }
+    { label: getString('tag'), value: ProtectionRulesType.TAG },
+    { label: getString('push'), value: ProtectionRulesType.PUSH }
   ]
 
   return (
@@ -102,28 +103,26 @@ const ProtectionRulesHeader = ({
           }
           {...permissionProps(permPushResult, standalone)}>
           <Container>
-            {Object.values(ProtectionRulesType)
-              .filter(type => type !== ProtectionRulesType.PUSH)
-              .map(type => {
-                return (
-                  <Menu.Item
-                    key={type}
-                    className={css.menuItem}
-                    text={
-                      <Layout.Horizontal>
-                        <Icon name={ruleType === type ? CodeIcon.Tick : CodeIcon.Blank} />
-                        <Text
-                          padding={{ left: 'xsmall' }}
-                          color={Color.BLACK}
-                          font={{ variation: FontVariation.BODY2_SEMI }}>
-                          {getString('protectionRules.newRule', { ruleType: type })}
-                        </Text>
-                      </Layout.Horizontal>
-                    }
-                    onClick={() => setRuleType(type)}
-                  />
-                )
-              })}
+            {Object.values(ProtectionRulesType).map(type => {
+              return (
+                <Menu.Item
+                  key={type}
+                  className={css.menuItem}
+                  text={
+                    <Layout.Horizontal>
+                      <Icon name={ruleType === type ? CodeIcon.Tick : CodeIcon.Blank} />
+                      <Text
+                        padding={{ left: 'xsmall' }}
+                        color={Color.BLACK}
+                        font={{ variation: FontVariation.BODY2_SEMI }}>
+                        {getString('protectionRules.newRule', { ruleType: type })}
+                      </Text>
+                    </Layout.Horizontal>
+                  }
+                  onClick={() => setRuleType(type)}
+                />
+              )
+            })}
           </Container>
         </SplitButton>
         <ToggleTabsBtn

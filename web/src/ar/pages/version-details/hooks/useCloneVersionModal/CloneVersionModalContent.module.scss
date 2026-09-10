@@ -18,6 +18,15 @@
   min-width: 400px;
 }
 
+.sectionHeading {
+  font-weight: 600;
+}
+
+.sectionHeadingWithTop {
+  font-weight: 600;
+  margin-top: var(--spacing-medium, 16px) !important;
+}
+
 .sourceSection {
   padding: var(--spacing-small, 8px) 0;
 }

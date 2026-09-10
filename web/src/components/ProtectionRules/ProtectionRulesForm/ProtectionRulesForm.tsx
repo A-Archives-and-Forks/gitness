@@ -52,6 +52,7 @@ import type {
   TypesPrincipalInfo,
   ProtectionBranch,
   ProtectionTag,
+  ProtectionPush,
   TypesUserGroupInfo
 } from 'services/code'
 import { useGetRepositoryMetadata } from 'hooks/useGetRepositoryMetadata'
@@ -63,6 +64,7 @@ import SearchDropDown, { renderPrincipalIcon } from 'components/SearchDropDown/S
 import { useQueryParams } from 'hooks/useQueryParams'
 import BranchRulesForm from './components/BranchRulesForm'
 import TagRulesForm from './components/TagRulesForm'
+import PushRulesForm from './components/PushRulesForm'
 import {
   convertToTargetList,
   getFilteredNormalizedPrincipalOptions,
@@ -296,6 +298,16 @@ const ProtectionRulesForm = (props: {
             blockDeletion: lifecycle?.delete_forbidden
           } as RulesFormPayload
         }
+        case ProtectionRulesType.PUSH: {
+          const { push } = (definition as ProtectionPush) || {}
+          return {
+            ...commonRulesForm,
+            limitFileSize: (push?.file_size_limit ?? 0) > 0,
+            fileSizeLimit: (push?.file_size_limit ?? 0) > 0 ? push?.file_size_limit : '',
+            principalCommitterMatch: push?.principal_committer_match,
+            secretScanningEnabled: push?.secret_scanning_enabled
+          } as RulesFormPayload
+        }
       }
     }
 
@@ -316,6 +328,16 @@ const ProtectionRulesForm = (props: {
         name: yup.string().trim().required().matches(REGEX_VALID_REPO_NAME, getString('validation.nameLogic')),
         minReviewers: yup.number().typeError(getString('enterANumber')),
         minDefaultReviewers: yup.number().typeError(getString('enterANumber')),
+        fileSizeLimit: yup
+          .number()
+          .typeError(getString('enterANumber'))
+          .test('file-size-limit', getString('protectionRules.fileSizeRequired'), function (fileSizeLimit) {
+            const { limitFileSize } = this.parent
+            if (limitFileSize) {
+              return (typeof fileSizeLimit === 'number' && fileSizeLimit > 0) || false
+            }
+            return true
+          }),
         defaultReviewersList: yup
           .array()
           .of(yup.object())
@@ -529,6 +551,8 @@ const ProtectionRulesForm = (props: {
                       normalizedPrincipalOptions: combinedOptions
                     }}
                   />
+                ) : ruleType === ProtectionRulesType.PUSH ? (
+                  <PushRulesForm formik={formik} />
                 ) : (
                   <TagRulesForm />
                 )}

@@ -217,6 +217,7 @@ renameFile: Rename __path__ to __newPath__
 switchBranchesTags: Switch branches/tags
 tag: Tag
 tags: Tags
+push: Push
 findOrCreateBranch: Find or create a branch
 findATag: Find a tag
 viewAllBranches: View all branches
@@ -1139,6 +1140,14 @@ protectionRules:
   requireMinDefaultReviewersContent: Require approval on pull requests from a minimum number of default reviewers
   atLeastMinReviewers: 'Select at least {{count}} default reviewers'
   atLeastMinReviewer: 'Select at least {{count}} default reviewer'
+  limitFileSize: Limit file size
+  limitFileSizeText: Block pushes that contain files exceeding the specified size limit (in bytes)
+  fileSizePlaceholder: Enter the maximum file size in bytes
+  fileSizeRequired: Enter a file size limit greater than 0
+  principalCommitterMatch: Enforce committer identity
+  principalCommitterMatchText: Only allow pushes where the committer of each commit matches the user performing the push
+  secretScanningEnabled: Enable secret scanning
+  secretScanningEnabledText: Block pushes that introduce new secrets to the repository
 codeOwner:
   title: Code Owner
   changesRequested: '{count} {count|1:change,changes} requested'

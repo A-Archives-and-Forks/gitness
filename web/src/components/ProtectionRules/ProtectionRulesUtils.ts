@@ -78,6 +78,10 @@ export type RulesFormPayload = {
   blockForcePush?: boolean
   requirePr?: boolean
   defaultReviewersEnabled?: boolean
+  limitFileSize?: boolean
+  fileSizeLimit?: string | number
+  principalCommitterMatch?: boolean
+  secretScanningEnabled?: boolean
 }
 
 export enum RuleFields {
@@ -97,7 +101,10 @@ export enum RuleFields {
   LIFECYCLE_DELETE_FORBIDDEN = 'lifecycle.delete_forbidden',
   MERGE_BLOCK = 'pullreq.merge.block',
   LIFECYCLE_UPDATE_FORBIDDEN = 'lifecycle.update_forbidden',
-  LIFECYCLE_UPDATE_FORCE_FORBIDDEN = 'lifecycle.update_force_forbidden'
+  LIFECYCLE_UPDATE_FORCE_FORBIDDEN = 'lifecycle.update_force_forbidden',
+  PUSH_FILE_SIZE_LIMIT = 'push.file_size_limit',
+  PUSH_PRINCIPAL_COMMITTER_MATCH = 'push.principal_committer_match',
+  PUSH_SECRET_SCANNING_ENABLED = 'push.secret_scanning_enabled'
 }
 
 export type ProtectionRulesMapType = Record<string, ProtectionRule>
@@ -120,7 +127,10 @@ export function createRuleFieldsMap(ruleDefinition: Rule): RuleFieldsMap {
     [RuleFields.LIFECYCLE_DELETE_FORBIDDEN]: false,
     [RuleFields.MERGE_BLOCK]: false,
     [RuleFields.LIFECYCLE_UPDATE_FORBIDDEN]: false,
-    [RuleFields.LIFECYCLE_UPDATE_FORCE_FORBIDDEN]: false
+    [RuleFields.LIFECYCLE_UPDATE_FORCE_FORBIDDEN]: false,
+    [RuleFields.PUSH_FILE_SIZE_LIMIT]: false,
+    [RuleFields.PUSH_PRINCIPAL_COMMITTER_MATCH]: false,
+    [RuleFields.PUSH_SECRET_SCANNING_ENABLED]: false
   }
   if (ruleDefinition?.pullreq) {
     if (ruleDefinition.pullreq.approvals) {
@@ -168,10 +178,19 @@ export function createRuleFieldsMap(ruleDefinition: Rule): RuleFieldsMap {
     ruleFieldsMap[RuleFields.LIFECYCLE_UPDATE_FORCE_FORBIDDEN] = !!ruleDefinition.lifecycle.update_force_forbidden
   }
 
+  if (ruleDefinition?.push) {
+    ruleFieldsMap[RuleFields.PUSH_FILE_SIZE_LIMIT] = (ruleDefinition.push.file_size_limit ?? 0) > 0
+    ruleFieldsMap[RuleFields.PUSH_PRINCIPAL_COMMITTER_MATCH] = !!ruleDefinition.push.principal_committer_match
+    ruleFieldsMap[RuleFields.PUSH_SECRET_SCANNING_ENABLED] = !!ruleDefinition.push.secret_scanning_enabled
+  }
+
   return ruleFieldsMap
 }
 
-export const getProtectionRules = (getString: UseStringsReturn['getString'], ruleType?: OpenapiRuleType) => {
+export const getProtectionRules = (
+  getString: UseStringsReturn['getString'],
+  ruleType?: OpenapiRuleType
+): ProtectionRulesMapType => {
   const rules = {
     blockCreation: {
       title: getString('protectionRules.blockCreation', { ruleType }),
@@ -292,6 +311,27 @@ export const getProtectionRules = (getString: UseStringsReturn['getString'], rul
       }
     case ProtectionRulesType.TAG:
       return rules
+    case ProtectionRulesType.PUSH:
+      return {
+        limitFileSize: {
+          title: getString('protectionRules.limitFileSize'),
+          requiredRule: {
+            [RuleFields.PUSH_FILE_SIZE_LIMIT]: true
+          }
+        },
+        principalCommitterMatch: {
+          title: getString('protectionRules.principalCommitterMatch'),
+          requiredRule: {
+            [RuleFields.PUSH_PRINCIPAL_COMMITTER_MATCH]: true
+          }
+        },
+        secretScanningEnabled: {
+          title: getString('protectionRules.secretScanningEnabled'),
+          requiredRule: {
+            [RuleFields.PUSH_SECRET_SCANNING_ENABLED]: true
+          }
+        }
+      }
   }
 
   return rules
@@ -328,7 +368,11 @@ export const rulesFormInitialPayload: RulesFormPayload = {
   blockUpdate: false,
   blockForcePush: false,
   requirePr: false,
-  defaultReviewersEnabled: false
+  defaultReviewersEnabled: false,
+  limitFileSize: false,
+  fileSizeLimit: '',
+  principalCommitterMatch: false,
+  secretScanningEnabled: false
 }
 
 const separateUsersAndUserGroups = (normalizedPrincipals?: NormalizedPrincipal[]) => {
@@ -377,6 +421,7 @@ export const getPayload = (formData: RulesFormPayload, ruleType: OpenapiRuleType
   const defaultReviewers = separateUsersAndUserGroups(defaultReviewersList)
 
   const isBranchRuleType = ruleType === ProtectionRulesType.BRANCH
+  const isPushRuleType = ruleType === ProtectionRulesType.PUSH
 
   const payload = {
     identifier: formData.name,
@@ -433,16 +478,27 @@ export const getPayload = (formData: RulesFormPayload, ruleType: OpenapiRuleType
             }
           }
         : {}),
-      lifecycle: {
-        create_forbidden: formData.blockCreation,
-        delete_forbidden: formData.blockDeletion,
-        ...(isBranchRuleType
-          ? {
-              update_forbidden: formData.requirePr || formData.blockUpdate,
-              update_force_forbidden: formData.blockForcePush && !formData.requirePr && !formData.blockUpdate
+      ...(isPushRuleType
+        ? {
+            push: {
+              file_size_limit:
+                formData.limitFileSize && formData.fileSizeLimit ? parseInt(formData.fileSizeLimit as string, 10) : 0,
+              principal_committer_match: formData.principalCommitterMatch,
+              secret_scanning_enabled: formData.secretScanningEnabled
             }
-          : { update_force_forbidden: formData.blockUpdate })
-      }
+          }
+        : {
+            lifecycle: {
+              create_forbidden: formData.blockCreation,
+              delete_forbidden: formData.blockDeletion,
+              ...(isBranchRuleType
+                ? {
+                    update_forbidden: formData.requirePr || formData.blockUpdate,
+                    update_force_forbidden: formData.blockForcePush && !formData.requirePr && !formData.blockUpdate
+                  }
+                : { update_force_forbidden: formData.blockUpdate })
+            }
+          })
     }
   }
   if (!formData.requireStatusChecks) {
